@@ -26,7 +26,7 @@ contract DeployAndUpgradeTest is StdCheats, Test {
         upgradeCube = new UpgradeCube();
         proxyAddress = deployProxy.deployProxy(OWNER);
 
-        // setup necessary roles
+        // Grant upgrade role
         vm.startBroadcast(OWNER);
         CUBE(payable(proxyAddress)).grantRole(keccak256("UPGRADER"), OWNER);
         vm.stopBroadcast();
@@ -58,8 +58,7 @@ contract DeployAndUpgradeTest is StdCheats, Test {
         upgradeCube.upgradeCube(OWNER, proxyAddress);
 
         CubeV2 newCube = CubeV2(payable(proxyAddress));
-
         string memory val = newCube.name();
-        assertEq(val, "Layer3 CUBE");
+        assertEq(val, vm.envString("CONTRACT_NAME"));
     }
 }

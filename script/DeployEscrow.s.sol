@@ -62,10 +62,10 @@ contract DeployEscrow is Script {
         vm.startBroadcast(_admin);
         Options memory opts;
         opts.constructorData = abi.encode(CUBE(cube));
+        opts.unsafeSkipStorageCheck = block.chainid == 31337; // Only skip on Anvil
         address proxy = Upgrades.deployUUPSProxy(
             "Factory.sol", abi.encodeCall(Factory.initialize, (_admin)), opts
         );
-
         vm.stopBroadcast();
         return proxy;
     }

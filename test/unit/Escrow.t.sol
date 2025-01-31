@@ -18,7 +18,7 @@ import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 contract EscrowTest is Test {
     DeployEscrow public deployer;
 
-    string constant SIGNATURE_DOMAIN = "LAYER3";
+    string constant SIGNATURE_DOMAIN = "BLUEPRINT";
     string constant SIGNING_VERSION = "1";
 
     uint256 internal ownerPrivateKey;

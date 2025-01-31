@@ -18,7 +18,19 @@ extra_output = ["storageLayout"]
 
 [etherscan]
 8453 = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
-84532 = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
+84532 = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+
+[profile.verifier]
+8453 = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
+84532 = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+
+[profile.verifier.delay]
+8453 = 15
+84532 = 15
+
+[profile.verifier.retries]
+runs = 3
+delay = 10
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 [fmt]

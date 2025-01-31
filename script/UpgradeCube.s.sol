@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {CUBE} from "../src/CUBE.sol";
 import {CubeV2} from "../test/contracts/CubeV2.sol";
 import {DevOpsTools} from "lib/foundry-devops/src/DevOpsTools.sol";
-import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {Upgrades, Options} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 contract UpgradeCube is Script {
     uint256 public DEFAULT_ANVIL_PRIVATE_KEY =
@@ -13,22 +13,37 @@ contract UpgradeCube is Script {
     uint256 public deployerKey;
 
     function run() public {
-        // if (block.chainid == 31337) {
-        //     deployerKey = DEFAULT_ANVIL_PRIVATE_KEY;
-        // } else {
-        //     deployerKey = vm.envUint("PRIVATE_KEY");
-        // }
-
-        address proxyAddr = 0xad4dCAfE9C020CF694FFaa943Be69eC182CA07DC;
-        address admin = 0x225d5BF80f4164eB8F7CE8408dD2Cfb9e35a8C57;
+        address proxyAddr = getProxyAddress();
+        address admin = getAdminAddress();
         upgradeCube(admin, proxyAddr);
+    }
+
+    function getProxyAddress() internal view returns (address) {
+        if (block.chainid == 31337) {
+            return abi.decode(
+                vm.parseJson(
+                    vm.readFile("broadcast/DeployProxy.s.sol/31337/run-latest.json"),
+                    ".transactions[0].contractAddress"
+                ),
+                (address)
+            );
+        }
+        return vm.envAddress("CUBE_PROXY_ADDRESS");
+    }
+
+    function getAdminAddress() internal returns (address) {
+        if (block.chainid == 31337) {
+            return vm.addr(DEFAULT_ANVIL_PRIVATE_KEY);
+        }
+        return vm.envAddress("DEPLOYER_ADDRESS");
     }
 
     function upgradeCube(address _admin, address _proxyAddress) public {
         console.log("admin ", _admin);
         vm.startBroadcast(_admin);
-
-        Upgrades.upgradeProxy(_proxyAddress, "CUBE.sol", new bytes(0));
+        Options memory opts;
+        opts.unsafeSkipStorageCheck = block.chainid == 31337; // Only skip on Anvil
+        Upgrades.upgradeProxy(_proxyAddress, "CUBE.sol", new bytes(0), opts);
         vm.stopBroadcast();
     }
 }

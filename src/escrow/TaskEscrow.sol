@@ -60,7 +60,7 @@ contract TaskEscrow is EIP712, ITokenType, Escrow {
 
     constructor(address _owner, address[] memory tokenAddr, address treasury)
         Escrow(_owner, tokenAddr, treasury)
-        EIP712("LAYER3", "1")
+        EIP712("BLUEPRINT", "1")
     {}
 
     function claimReward(ClaimData calldata data, bytes calldata signature) external payable {

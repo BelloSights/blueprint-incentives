@@ -61,7 +61,7 @@ contract CubeTest is Test {
     DeployProxy public deployer;
     CUBE public cubeContract;
 
-    string constant SIGNATURE_DOMAIN = "LAYER3";
+    string constant SIGNATURE_DOMAIN = "BLUEPRINT";
     string constant SIGNING_VERSION = "1";
 
     Helper internal helper;
@@ -1148,8 +1148,8 @@ contract CubeTest is Test {
         string memory name = cubeContract.name();
         string memory symbol = cubeContract.symbol();
 
-        assertEq("Layer3 CUBE", name);
-        assertEq("CUBE", symbol);
+        assertEq("Blueprint CUBE", name);
+        assertEq("BPCUBE", symbol);
     }
 
     function testSetTrueMintingToTrueAgain() public {
@@ -1291,5 +1291,10 @@ contract CubeTest is Test {
         (CUBE.CubeData memory _data, bytes memory _sig) = _getSignedCubeMintData();
         vm.expectRevert(CUBE.CUBE__FeeNotEnough.selector);
         cubeContract.mintCube(_data, _sig);
+    }
+
+    function getTestSignature(uint256 privateKey, bytes32 digest) internal returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        return abi.encodePacked(r, s, v);
     }
 }

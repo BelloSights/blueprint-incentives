@@ -25,7 +25,7 @@ contract EscrowFactoryTest is Test {
     DeployEscrow public deployer;
     Factory public factoryContract;
 
-    string constant SIGNATURE_DOMAIN = "LAYER3";
+    string constant SIGNATURE_DOMAIN = "BLUEPRINT";
     string constant SIGNING_VERSION = "1";
 
     uint256 internal ownerPrivateKey;

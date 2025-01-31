@@ -44,6 +44,26 @@ make build
 
 ```bash
 make deploy_proxy ARGS="--network base_sepolia"
+make deploy_escrow ARGS="--network base_sepolia"
+```
+
+### Verification
+
+For proxy contracts, use this command after deployment (replace addresses with your values):
+
+```bash
+forge verify-contract $DEPLOYED_FACTORY_PROXY_ADDRESS \
+  --chain-id 84532 \
+  --etherscan-api-key $BASESCAN_API_KEY \
+  --constructor-args $(cast abi-encode "constructor(address,bytes)" $FACTORY_IMPLEMENTATION_ADDRESS 0x$(cast sig "initialize(address)" | cut -c3-)$(cast abi-encode "x(address)" $TREASURY_ADDRESS | cut -c3-)) \
+  --rpc-url $BASE_SEPOLIA_RPC \
+  "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy" \
+  --watch
+```
+
+Example initialization calldata generation:
+```bash
+echo "0x$(cast sig "initialize(address)" | cut -c3-)$(cast abi-encode "x(address)" $TREASURY_ADDRESS | cut -c3-)"
 ```
 
 ### Test
@@ -142,4 +162,4 @@ _Note: All bounties are at the discretion of the Layer3 team and will be awarded
 
 ### License
 
-This repo is released under the Apache 2 license, see [LICENSE](./LICENSE) for more details. However, some files are licensed under MIT, such as the test and script files.
+This repo is released under the Apache 2 license, see [LICENSE](./LICENSE) for more details. However, some files are licensed under MIT, such as the test and script files.                                                       

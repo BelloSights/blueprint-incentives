@@ -23,7 +23,7 @@ contract TaskEscrowTest is Test {
 
     DeployEscrow public deployer;
 
-    string constant SIGNATURE_DOMAIN = "LAYER3";
+    string constant SIGNATURE_DOMAIN = "BLUEPRINT";
     string constant SIGNING_VERSION = "1";
 
     uint256 internal ownerPrivateKey;
