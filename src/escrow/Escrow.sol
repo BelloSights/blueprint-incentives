@@ -8,15 +8,15 @@
         \/    \/\/         \/            \/
 */
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.26;
 
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
-import {IERC1155} from "@openzeppelin/contracts/interfaces/IERC1155.sol";
-import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin-contracts/interfaces/IERC20.sol";
+import {IERC721} from "@openzeppelin-contracts/interfaces/IERC721.sol";
+import {IERC1155} from "@openzeppelin-contracts/interfaces/IERC1155.sol";
+import {ERC721Holder} from "@openzeppelin-contracts/token/ERC721/utils/ERC721Holder.sol";
+import {ERC1155Holder} from "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {Ownable2Step} from "@openzeppelin-contracts/access/Ownable2Step.sol";
+import {Ownable} from "@openzeppelin-contracts/access/Ownable.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
 
 contract Escrow is IEscrow, ERC721Holder, ERC1155Holder, Ownable2Step {
@@ -56,11 +56,11 @@ contract Escrow is IEscrow, ERC721Holder, ERC1155Holder, Ownable2Step {
     mapping(address => bool) public s_whitelistedTokens;
 
     /// @notice Initializes the escrow contract with specified whitelisted tokens and treasury address.
+    /// @param _owner The owner of the escrow (in our design, Incentive).
     /// @param tokenAddr An array of addresses of tokens to whitelist upon initialization.
     /// @param treasury The address of the treasury for receiving rake payments.
     constructor(address _owner, address[] memory tokenAddr, address treasury) Ownable(_owner) {
         i_treasury = treasury;
-
         uint256 length = tokenAddr.length;
         for (uint256 i = 0; i < length;) {
             s_whitelistedTokens[tokenAddr[i]] = true;
@@ -194,7 +194,6 @@ contract Escrow is IEscrow, ERC721Holder, ERC1155Holder, Ownable2Step {
         if (!s_whitelistedTokens[token]) {
             revert Escrow__TokenNotWhitelisted();
         }
-
         IERC1155(token).safeTransferFrom(address(this), to, tokenId, amount, "");
         emit EscrowERC1155Transfer(token, to, amount, tokenId);
     }
@@ -227,12 +226,10 @@ contract Escrow is IEscrow, ERC721Holder, ERC1155Holder, Ownable2Step {
                 revert Escrow__NativeRakeError();
             }
         }
-
         (bool rewardSuccess,) = payable(to).call{value: amount - rake, gas: GAS_CAP}("");
         if (!rewardSuccess) {
             revert Escrow__NativePayoutError();
         }
-
         emit EscrowNativeTransfer(to, amount, rake, i_treasury);
     }
 
@@ -245,6 +242,7 @@ contract Escrow is IEscrow, ERC721Holder, ERC1155Holder, Ownable2Step {
         return super.supportsInterface(interfaceId);
     }
 
+    // Prevent ownership renouncement.
     function renounceOwnership() public override onlyOwner {}
 
     fallback() external payable {}

@@ -1,19 +1,31 @@
 import "dotenv/config";
-import { CubeSDK } from "./sdk";
-import { CubeContract, EscrowContract, FactoryContract } from "./types";
+import { IncentiveSDK } from "./incentiveSdk";
+import { StorefrontSDK } from "./storefrontSdk";
 import {
-  cubeContract,
+  EscrowContract,
+  FactoryContract,
+  IncentiveContract,
+  StorefrontContract,
+} from "./types";
+import {
   factoryContract,
+  incentiveContract,
   publicClient,
+  storefrontContract,
   walletClient,
 } from "./viem";
 
 export {
-  cubeContract, CubeSDK, factoryContract,
+  factoryContract,
+  incentiveContract,
+  IncentiveSDK,
   publicClient,
+  storefrontContract,
+  StorefrontSDK,
   walletClient,
-  type CubeContract,
   type EscrowContract,
-  type FactoryContract
+  type FactoryContract,
+  type IncentiveContract,
+  type StorefrontContract
 };
 

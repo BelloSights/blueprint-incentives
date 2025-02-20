@@ -7,7 +7,7 @@ endif
 # Load environment variables
 -include $(ENV_FILE)
 
-.PHONY: deploy test coverage build deploy_proxy fork_test deploy_all deploy_escrow verify_base_sepolia
+.PHONY: deploy test coverage build deploy_proxy fork_test deploy_all deploy_escrow verify_base_sepolia deploy_buyback deploy_storefront deploy_treasury deploy_token
 
 DEFAULT_ANVIL_PRIVATE_KEY := 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
@@ -59,41 +59,36 @@ ifeq ($(findstring --unsafe,$(ARGS)),--unsafe)
 	NETWORK_ARGS += --unsafe
 endif
 
-deploy:
-	@forge script script/DeployCube.s.sol:DeployCube $(NETWORK_ARGS)
+deploy_treasury:
+	@source $(ENV_FILE) && forge script script/DeployTreasury.s.sol:DeployTreasury $(NETWORK_ARGS) --ffi
+
+deploy_token:
+	@source $(ENV_FILE) && forge script script/DeployToken.s.sol:DeployToken $(NETWORK_ARGS) --ffi
+
+deploy_storefront:
+	@source $(ENV_FILE) && forge script script/DeployStorefront.s.sol:DeployStorefront $(NETWORK_ARGS) --ffi
 
 deploy_proxy:
 	@source $(ENV_FILE) && forge script script/DeployProxy.s.sol:DeployProxy $(NETWORK_ARGS) --ffi
 
+deploy_escrow:
+	@source $(ENV_FILE) && forge script script/DeployEscrow.s.sol:DeployEscrow $(NETWORK_ARGS) --ffi --sig "deploy()"
+
 upgrade_proxy:
-	@source $(ENV_FILE) && forge script script/UpgradeCube.s.sol:UpgradeCube $(NETWORK_ARGS) \
+	@source $(ENV_FILE) && forge script script/UpgradeIncentive.s.sol:UpgradeIncentive $(NETWORK_ARGS) \
 		--ffi \
 		--sig "run()"
 
 fork_test:
 	@forge test --rpc-url $(RPC_ENDPOINT) -vvv
 
-deploy_all: deploy_proxy deploy_escrow
-
-# Get proxy address from latest deployment
-CUBE_PROXY_ADDRESS := $(shell ./bash-scripts/get-proxy-address.sh)
-
-deploy_escrow:
-ifndef CUBE_PROXY_ADDRESS
-	$(error Run "make deploy_proxy" first)
-endif
-	@forge script script/DeployEscrow.s.sol:DeployEscrow $(NETWORK_ARGS) \
-		--ffi \
-		--sig "run(address,address,address)" \
-		$(shell cast wallet address --private-key $(PRIVATE_KEY)) \
-		$(TREASURY_ADDRESS) \
-		$(CUBE_PROXY_ADDRESS)
+deploy_all: deploy_proxy deploy_token deploy_storefront deploy_treasury
 
 verify_base_sepolia:
 	@if [ -z "${ADDRESS}" ] || [ -z "${CONTRACT}" ]; then \
 		echo "Usage: make verify ADDRESS=0x... CONTRACT=path:Name"; \
 		echo "Example targets:"; \
-		echo "  CUBE:     src/CUBE.sol:CUBE"; \
+		echo "  Incentive:     src/Incentive.sol:Incentive"; \
 		echo "  Factory:  src/escrow/Factory.sol:Factory"; \
 		echo "  Escrow:   src/escrow/Escrow.sol:Escrow"; \
 		exit 1; \

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.26;
 
 import {Test, console, Vm, stdError} from "forge-std/Test.sol";
 
@@ -10,10 +10,10 @@ import {MockERC20} from "../mock/MockERC20.sol";
 import {MockERC721} from "../mock/MockERC721.sol";
 import {MockERC1155} from "../mock/MockERC1155.sol";
 
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {IERC721} from "@openzeppelin-contracts/token/ERC721/IERC721.sol";
+import {ERC721} from "@openzeppelin-contracts/token/ERC721/ERC721.sol";
+import {ERC20} from "@openzeppelin-contracts/token/ERC20/ERC20.sol";
+import {ERC1155} from "@openzeppelin-contracts/token/ERC1155/ERC1155.sol";
 
 contract EscrowTest is Test {
     DeployEscrow public deployer;
@@ -367,7 +367,7 @@ contract EscrowTest is Test {
         assert(owner == adminAddress);
     }
 
-    function testEscrowERC165Interface() public {
+    function testEscrowERC165Interface() public view {
         // ERC165 - 0x01ffc9a7
         assertEq(escrowMock.supportsInterface(0x01ffc9a7), true);
     }

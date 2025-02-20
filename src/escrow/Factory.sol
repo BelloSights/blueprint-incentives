@@ -8,33 +8,54 @@
         \/    \/\/         \/            \/
 */
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.26;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+    "@openzeppelin-contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Escrow} from "./Escrow.sol";
-import {CUBE} from "../CUBE.sol";
+import {Incentive} from "../Incentive.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
+import {ITokenType} from "../escrow/interfaces/ITokenType.sol";
 
 contract Factory is IFactory, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
-    error Factory__OnlyCallableByCUBE();
-    error Factory__CUBEQuestIsActive();
-    error Factory__NoQuestEscrowFound();
+    // ===== ERRORS =====
+    error Factory__OnlyCallableByIncentive();
     error Factory__OnlyCallableByAdmin();
+    error Factory__IncentiveQuestIsActive();
+    error Factory__NoEscrowForId();
+    error Factory__EscrowDisabled();
     error Factory__EscrowAlreadyExists();
     error Factory__ZeroAddress();
+    error Factory__QuestAlreadyRegistered();
+    error Factory__QuestNotRegistered();
 
+    // ===== STATE =====
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
-    CUBE public immutable i_cube;
-    mapping(uint256 => address) public s_escrows;
-    mapping(uint256 => address) public s_escrow_admin;
+    Incentive public immutable i_incentive;
+    uint256 public s_nextEscrowId;
 
+    struct EscrowInfo {
+        uint256 escrowId;
+        address escrow;
+        address creator;
+        bool active;
+    }
+
+    // Mapping from escrowId to its info.
+    mapping(uint256 => EscrowInfo) public s_escrows;
+    // Mapping from questId to the escrow id that should be used.
+    mapping(uint256 => uint256) public s_questToEscrow;
+
+    // ===== EVENTS =====
     event EscrowRegistered(
-        address indexed registror, address indexed escrowAddress, uint256 indexed questId
+        address indexed registror, uint256 indexed escrowId, address indexed escrow, address creator
     );
+    event EscrowDisabled(uint256 indexed escrowId);
+    event EscrowEnabled(uint256 indexed escrowId);
+    event QuestRegistered(uint256 indexed questId, uint256 indexed escrowId);
     event TokenPayout(
         address indexed receiver,
         address indexed tokenAddress,
@@ -52,155 +73,164 @@ contract Factory is IFactory, Initializable, AccessControlUpgradeable, UUPSUpgra
         uint8 tokenType,
         uint256 questId
     );
-    event EscrowAdminUpdated(
-        address indexed updater, uint256 indexed questId, address indexed newAdmin
-    );
-
-    modifier onlyAdmin(uint256 questId) {
-        if (msg.sender != s_escrow_admin[questId] && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
-            revert Factory__OnlyCallableByAdmin();
-        }
-        _;
-    }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(CUBE cube) {
-        i_cube = cube;
+    constructor(Incentive incentive) {
+        i_incentive = incentive;
         _disableInitializers();
     }
 
-    /// @notice Initializes the contract by setting up roles and linking to the CUBE contract.
+    /// @notice Initializes the Factory contract.
     /// @param admin Address to be granted the default admin role.
     function initialize(address admin) external override initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
-
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        unchecked {
+            s_nextEscrowId = 1;
+        }
     }
 
-    /// @notice Updates the admin of a specific escrow.
-    /// @dev Can only be called by the current escrow admin.
-    /// @param questId Identifier of the quest associated with the escrow.
-    /// @param newAdmin Address of the new admin.
-    function updateEscrowAdmin(uint256 questId, address newAdmin) external override {
-        if (s_escrow_admin[questId] != msg.sender) {
-            revert Factory__OnlyCallableByAdmin();
+    /// @notice Creates a new escrow for a creator.
+    /// @param creator The address of the creator (informational only; the escrow is owned by Incentive).
+    /// @param whitelistedTokens Array of token addresses to whitelist.
+    /// @param treasury Address of the treasury for receiving rake fees.
+    /// @return escrowId The unique identifier of the newly deployed escrow.
+    function createEscrow(address creator, address[] calldata whitelistedTokens, address treasury)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        returns (uint256)
+    {
+        if (creator == address(0)) revert Factory__ZeroAddress();
+        uint256 escrowId = s_nextEscrowId;
+        // Deploy the new escrow with the Incentive contract as owner.
+        address escrowAddress = address(
+            new Escrow{salt: bytes32(keccak256(abi.encode(creator, escrowId)))}(
+                address(this), whitelistedTokens, treasury
+            )
+        );
+        s_escrows[escrowId] =
+            EscrowInfo({escrowId: escrowId, escrow: escrowAddress, creator: creator, active: true});
+        emit EscrowRegistered(msg.sender, escrowId, escrowAddress, creator);
+        unchecked {
+            s_nextEscrowId++;
         }
-        if (newAdmin == address(0)) {
-            revert Factory__ZeroAddress();
-        }
-        s_escrow_admin[questId] = newAdmin;
-        emit EscrowAdminUpdated(msg.sender, questId, newAdmin);
+        return escrowId;
     }
 
-    /// @notice Creates a new escrow for a quest.
-    /// @dev Can only be called by an account with the default admin role.
-    /// @param questId The quest the escrow should be created for.
-    /// @param admin Admin of the new escrow.
-    /// @param whitelistedTokens Array of addresses of tokens that are whitelisted for the escrow.
-    /// @param treasury Address of the treasury where fees are sent.
-    function createEscrow(
-        uint256 questId,
-        address admin,
-        address[] calldata whitelistedTokens,
-        address treasury
-    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (s_escrows[questId] != address(0)) {
-            revert Factory__EscrowAlreadyExists();
-        }
-
-        s_escrow_admin[questId] = admin;
-        address escrow =
-            address(new Escrow{salt: bytes32(questId)}(address(this), whitelistedTokens, treasury));
-        s_escrows[questId] = escrow;
-
-        emit EscrowRegistered(msg.sender, escrow, questId);
+    /// @notice Disables an escrow so that no funds can be sent.
+    /// @param escrowId The identifier of the escrow to disable.
+    function disableEscrow(uint256 escrowId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        EscrowInfo storage info = s_escrows[escrowId];
+        if (info.escrow == address(0)) revert Factory__NoEscrowForId();
+        info.active = false;
+        emit EscrowDisabled(escrowId);
     }
 
-    /// @notice Adds a token to the whitelist, allowing it to be used in the escrow.
-    /// @param token The address of the token to whitelist.
+    /// @notice Re-enables a previously disabled escrow.
+    /// @param escrowId The identifier of the escrow to enable.
+    function enableEscrow(uint256 escrowId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        EscrowInfo storage info = s_escrows[escrowId];
+        if (info.escrow == address(0)) revert Factory__NoEscrowForId();
+        info.active = true;
+        emit EscrowEnabled(escrowId);
+    }
+
+    /// @notice Registers a quest to point to an escrow.
+    /// @param questId The quest identifier.
+    /// @param escrowId The escrow that should be used.
+    /// Only accounts with the DEFAULT_ADMIN_ROLE can call this.
+    function registerQuest(uint256 questId, uint256 escrowId)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        // if the quest is already registered, allow idempotent registration for the same escrowId.
+        if (s_questToEscrow[questId] != 0) {
+            if (s_questToEscrow[questId] == escrowId) {
+                return;
+            }
+            revert Factory__QuestAlreadyRegistered();
+        }
+        s_questToEscrow[questId] = escrowId;
+        emit QuestRegistered(questId, escrowId);
+    }
+
+    /// @notice Adds a token to the whitelist for the escrow associated with a quest.
+    /// @param questId The quest identifier.
+    /// @param token The token address to whitelist.
     function addTokenToWhitelist(uint256 questId, address token)
         external
-        override
-        onlyAdmin(questId)
+        onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        address escrow = s_escrows[questId];
-        if (escrow == address(0)) {
-            revert Factory__NoQuestEscrowFound();
-        }
-
-        IEscrow(escrow).addTokenToWhitelist(token);
+        uint256 escrowId = s_questToEscrow[questId];
+        if (escrowId == 0) revert Factory__QuestNotRegistered();
+        EscrowInfo storage info = s_escrows[escrowId];
+        if (!info.active) revert Factory__EscrowDisabled();
+        IEscrow(info.escrow).addTokenToWhitelist(token);
     }
 
-    /// @notice Removes a token from the whitelist.
-    /// @param token The address of the token to remove from the whitelist.
+    /// @notice Removes a token from the whitelist for the escrow associated with a quest.
+    /// @param questId The quest identifier.
+    /// @param token The token address to remove.
     function removeTokenFromWhitelist(uint256 questId, address token)
         external
-        override
-        onlyAdmin(questId)
+        onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        address escrow = s_escrows[questId];
-        if (escrow == address(0)) {
-            revert Factory__NoQuestEscrowFound();
-        }
-
-        IEscrow(escrow).removeTokenFromWhitelist(token);
+        uint256 escrowId = s_questToEscrow[questId];
+        if (escrowId == 0) revert Factory__QuestNotRegistered();
+        EscrowInfo storage info = s_escrows[escrowId];
+        if (!info.active) revert Factory__EscrowDisabled();
+        IEscrow(info.escrow).removeTokenFromWhitelist(token);
     }
 
     /// @notice Withdraws funds from the escrow associated with a quest.
-    /// @dev Withdrawal can only be initiated by the escrow admin or an account with the default admin role.
-    /// @param questId The quest the escrow is mapped to.
-    /// @param to Recipient of the funds.
-    /// @param token Address of the token to withdraw.
-    /// @param tokenId Identifier of the token (for ERC721 and ERC1155).
-    /// @param tokenType Type of the token being withdrawn.
+    /// @param questId The quest identifier.
+    /// @param to Recipient address.
+    /// @param token The token address (use address(0) for native).
+    /// @param tokenId The token ID (if applicable).
+    /// @param tokenType The token type.
     function withdrawFunds(
         uint256 questId,
         address to,
         address token,
         uint256 tokenId,
         TokenType tokenType
-    ) external override onlyAdmin(questId) {
-        // only allow withdrawals if quest is inactive
-        if (i_cube.isQuestActive(questId)) {
-            revert Factory__CUBEQuestIsActive();
-        }
-        address escrow = s_escrows[questId];
-        if (escrow == address(0)) {
-            revert Factory__NoQuestEscrowFound();
-        }
-
-        if (tokenType == TokenType.NATIVE) {
-            uint256 escrowBalance = escrow.balance;
-            IEscrow(escrow).withdrawNative(to, escrowBalance, 0);
+    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (i_incentive.isQuestActive(questId)) revert Factory__IncentiveQuestIsActive();
+        uint256 escrowId = s_questToEscrow[questId];
+        if (escrowId == 0) revert Factory__QuestNotRegistered();
+        EscrowInfo storage info = s_escrows[escrowId];
+        if (!info.active) revert Factory__EscrowDisabled();
+        if (tokenType == ITokenType.TokenType.NATIVE) {
+            uint256 escrowBalance = info.escrow.balance;
+            IEscrow(info.escrow).withdrawNative(to, escrowBalance, 0);
             emit EscrowWithdrawal(
                 msg.sender, to, address(0), 0, escrowBalance, uint8(tokenType), questId
             );
-        } else if (tokenType == TokenType.ERC20) {
-            uint256 erc20Amount = IEscrow(escrow).escrowERC20Reserves(token);
-            IEscrow(escrow).withdrawERC20(token, to, erc20Amount, 0);
+        } else if (tokenType == ITokenType.TokenType.ERC20) {
+            uint256 erc20Amount = IEscrow(info.escrow).escrowERC20Reserves(token);
+            IEscrow(info.escrow).withdrawERC20(token, to, erc20Amount, 0);
             emit EscrowWithdrawal(msg.sender, to, token, 0, erc20Amount, uint8(tokenType), questId);
-        } else if (tokenType == TokenType.ERC721) {
-            IEscrow(escrow).withdrawERC721(token, to, tokenId);
+        } else if (tokenType == ITokenType.TokenType.ERC721) {
+            IEscrow(info.escrow).withdrawERC721(token, to, tokenId);
             emit EscrowWithdrawal(msg.sender, to, token, tokenId, 1, uint8(tokenType), questId);
-        } else if (tokenType == TokenType.ERC1155) {
-            uint256 erc1155Amount = IEscrow(escrow).escrowERC1155Reserves(token, tokenId);
-            IEscrow(escrow).withdrawERC1155(token, to, tokenId, erc1155Amount);
+        } else if (tokenType == ITokenType.TokenType.ERC1155) {
+            uint256 erc1155Amount = IEscrow(info.escrow).escrowERC1155Reserves(token, tokenId);
+            IEscrow(info.escrow).withdrawERC1155(token, to, tokenId, erc1155Amount);
             emit EscrowWithdrawal(
                 msg.sender, to, token, tokenId, erc1155Amount, uint8(tokenType), questId
             );
         }
     }
 
-    /// @notice Distributes rewards for a quest.
-    /// @dev Can only be called by the CUBE contract.
-    /// @param questId The quest the escrow is mapped to.
-    /// @param token Address of the token for rewards.
-    /// @param to Recipient of the rewards.
-    /// @param amount Amount of tokens.
-    /// @param rewardTokenId Token ID for ERC721 and ERC1155 rewards.
-    /// @param tokenType Type of the token for rewards.
-    /// @param rakeBps Basis points for the rake to be taken from the reward.
+    /// @notice Distributes rewards from the escrow associated with a quest.
+    /// @param questId The quest identifier.
+    /// @param token The token address (use address(0) for native).
+    /// @param to Recipient address.
+    /// @param amount Amount to send.
+    /// @param rewardTokenId The reward token ID (if applicable).
+    /// @param tokenType The token type.
+    /// @param rakeBps Basis points for rake (if applicable).
     function distributeRewards(
         uint256 questId,
         address token,
@@ -210,27 +240,34 @@ contract Factory is IFactory, Initializable, AccessControlUpgradeable, UUPSUpgra
         TokenType tokenType,
         uint256 rakeBps
     ) external override {
-        if (msg.sender != address(i_cube)) {
-            revert Factory__OnlyCallableByCUBE();
-        }
-        address escrow = s_escrows[questId];
-        if (escrow == address(0)) {
-            revert Factory__NoQuestEscrowFound();
-        }
-
+        if (msg.sender != address(i_incentive)) revert Factory__OnlyCallableByIncentive();
+        uint256 escrowId = s_questToEscrow[questId];
+        if (escrowId == 0) revert Factory__QuestNotRegistered();
+        EscrowInfo storage info = s_escrows[escrowId];
+        if (!info.active) revert Factory__EscrowDisabled();
         if (tokenType == TokenType.NATIVE) {
-            IEscrow(escrow).withdrawNative(to, amount, rakeBps);
+            IEscrow(info.escrow).withdrawNative(to, amount, rakeBps);
             emit TokenPayout(to, address(0), 0, amount, uint8(tokenType), questId);
         } else if (tokenType == TokenType.ERC20) {
-            IEscrow(escrow).withdrawERC20(token, to, amount, rakeBps);
+            IEscrow(info.escrow).withdrawERC20(token, to, amount, rakeBps);
             emit TokenPayout(to, token, 0, amount, uint8(tokenType), questId);
         } else if (tokenType == TokenType.ERC721) {
-            IEscrow(escrow).withdrawERC721(token, to, rewardTokenId);
+            IEscrow(info.escrow).withdrawERC721(token, to, rewardTokenId);
             emit TokenPayout(to, token, rewardTokenId, 1, uint8(tokenType), questId);
         } else if (tokenType == TokenType.ERC1155) {
-            IEscrow(escrow).withdrawERC1155(token, to, amount, rewardTokenId);
+            IEscrow(info.escrow).withdrawERC1155(token, to, amount, rewardTokenId);
             emit TokenPayout(to, token, rewardTokenId, amount, uint8(tokenType), questId);
         }
+    }
+
+    // ----------------------------------------------------------------
+    // Helper function (fulfilling interface) to return the escrow address for a quest.
+    // ----------------------------------------------------------------
+    function getEscrow(uint256 questId) external view override returns (address) {
+        uint256 escrowId = s_questToEscrow[questId];
+        if (escrowId == 0) revert Factory__QuestNotRegistered();
+        EscrowInfo storage info = s_escrows[escrowId];
+        return info.escrow;
     }
 
     function supportsInterface(bytes4 interfaceId)

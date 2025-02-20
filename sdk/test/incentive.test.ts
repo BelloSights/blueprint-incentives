@@ -1,9 +1,10 @@
-import console from "console";
 import dotenv from "dotenv";
 import path from "path";
-import { erc20Abi, erc721Abi, zeroAddress } from "viem";
+import { erc20Abi, zeroAddress } from "viem";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CubeSDK } from "../src/sdk";
+import { blueprintTokenAbi } from "../abis/blueprintTokenAbi";
+import { IncentiveSDK } from "../src/incentiveSdk";
+import { TreasurySDK } from "../src/treasurySdk";
 import {
   DIFFICULTIES,
   factoryContract,
@@ -14,9 +15,6 @@ import {
 } from "../src/viem";
 import {
   ERC20_TOKEN,
-  L3_TOKEN,
-  NFT_ID,
-  NFT_TOKEN,
   QUEST_ID,
   TEST_COMMUNITIES,
   TEST_CUBE_DATA,
@@ -29,17 +27,20 @@ dotenv.config({
   path: path.resolve(__dirname, "../../.env"),
 });
 
-describe("Cube SDK", () => {
-  let sdk: CubeSDK;
+describe("Incentive SDK", () => {
+  let sdk: IncentiveSDK;
+  let treasurySdk: TreasurySDK;
   let escrowAddress: `0x${string}`;
 
   beforeAll(async () => {
-    sdk = new CubeSDK(publicClient, walletClient);
-    // Get escrow address
+    sdk = new IncentiveSDK(publicClient, walletClient);
+    treasurySdk = new TreasurySDK(publicClient, walletClient);
+
+    // Get escrow address using the updated mapping
     escrowAddress = await sdk.getEscrowAddress(QUEST_ID);
     console.log("escrow address:", escrowAddress);
 
-    // Approve ERC20 tokens first
+    // Approve ERC20 tokens for the escrow
     const approveHash = await walletClient.writeContract({
       address: ERC20_TOKEN,
       abi: erc20Abi,
@@ -49,11 +50,7 @@ describe("Cube SDK", () => {
     await publicClient.waitForTransactionReceipt({ hash: approveHash });
     console.log("approved erc20");
 
-    // Fund escrow with total amounts
-    // const escrow = await sdk.getEscrowContract(QUEST_ID);
-    // console.log("escrow contract:", escrow);
-
-    // Fund ERC20
+    // Transfer ERC20 tokens to the escrow
     const transferHash = await walletClient.writeContract({
       address: ERC20_TOKEN,
       abi: erc20Abi,
@@ -63,110 +60,33 @@ describe("Cube SDK", () => {
     await publicClient.waitForTransactionReceipt({ hash: transferHash });
     console.log("funded erc20");
 
-    // First verify NFT ownership
-    const initialOwner = await publicClient.readContract({
-      address: NFT_TOKEN,
-      abi: erc721Abi,
-      functionName: "ownerOf",
-      args: [NFT_ID],
-    });
-    console.log("Initial NFT Owner:", initialOwner);
-
-    if (
-      initialOwner.toLowerCase() !== walletClient.account.address.toLowerCase()
-    ) {
-      throw new Error(
-        `Test account ${walletClient.account.address} does not own NFT ${NFT_ID}`
-      );
-    }
-
-    // NFT approval (standard ERC721 flow)
-    // const nftApproveEscrowHash = await walletClient.writeContract({
-    //   address: NFT_TOKEN,
-    //   abi: erc721Abi,
-    //   functionName: "approve",
-    //   args: [escrowAddress, NFT_ID], // Should be (spender, tokenId)
-    // });
-    // await publicClient.waitForTransactionReceipt({
-    //   hash: nftApproveEscrowHash,
-    // });
-    const nftApprovalWalletHash = await walletClient.writeContract({
-      address: NFT_TOKEN,
-      abi: erc721Abi,
-      functionName: "approve",
-      args: [walletClient.account.address, NFT_ID],
-    });
-    await publicClient.waitForTransactionReceipt({
-      hash: nftApprovalWalletHash,
-    });
-    console.log("approved nft");
-
-    // Fund NFT
-    const nftTransferHash = await walletClient.writeContract({
-      address: NFT_TOKEN,
-      abi: erc721Abi,
-      functionName: "transferFrom",
-      args: [walletClient.account.address, escrowAddress, NFT_ID],
-    });
-    const nftTransferReceipt = await publicClient.waitForTransactionReceipt({
-      hash: nftTransferHash,
-    });
-    console.log("NFT Transfer Status:", nftTransferReceipt.status);
-
-    // Check balances
+    // Check ERC20 balances and allowance
     const erc20Balance = await publicClient.readContract({
       address: ERC20_TOKEN,
-      abi: erc20Abi,
+      abi: blueprintTokenAbi,
       functionName: "balanceOf",
       args: [walletClient.account.address],
     });
     console.log("Wallet ERC20 Balance:", erc20Balance);
-
     const allowance = await publicClient.readContract({
       address: ERC20_TOKEN,
-      abi: erc20Abi,
+      abi: blueprintTokenAbi,
       functionName: "allowance",
       args: [walletClient.account.address, escrowAddress],
     });
     console.log("ERC20 Allowance:", allowance);
 
-    // Check NFT ownership
-    const nftOwner = await publicClient.readContract({
-      address: NFT_TOKEN,
-      abi: erc721Abi,
-      functionName: "ownerOf",
-      args: [NFT_ID],
-    });
-    console.log("NFT owner:", nftOwner);
-
-    // Add after each transaction
+    // Log the transaction nonce before further actions
     const preNonce = await publicClient.getTransactionCount({
       address: walletClient.account.address,
       blockTag: "pending",
     });
     console.log("Pre nonce:", preNonce);
 
-    // Check if l3 token is set
-    const cubeContract = await sdk.getCubeContract();
-    const l3TokenAddress = await publicClient.readContract({
-      ...cubeContract,
-      functionName: "s_l3Token",
-    });
-    console.log("L3_TOKEN_ADDRESS", l3TokenAddress);
-    if (l3TokenAddress !== L3_TOKEN) {
-      const setL3TxHash = await walletClient.writeContract({
-        ...cubeContract,
-        functionName: "setL3TokenAddress",
-        args: [L3_TOKEN],
-      });
-      // Wait for transaction confirmation
-      await publicClient.waitForTransactionReceipt({ hash: setL3TxHash });
-      console.log("L3 token set and confirmed");
-    }
-
-    // Check if treasury is set
+    // Check if treasury is set in the incentive contract
+    const incentiveContract = await sdk.getCubeContract();
     const currentTreasury = await publicClient.readContract({
-      ...cubeContract,
+      ...incentiveContract,
       functionName: "s_treasury",
     });
     if (currentTreasury === zeroAddress) {
@@ -176,45 +96,40 @@ describe("Cube SDK", () => {
         );
       }
       const setTreasuryHash = await walletClient.writeContract({
-        ...cubeContract,
+        ...incentiveContract,
         functionName: "setTreasury",
         args: [process.env.TREASURY_ADDRESS as `0x${string}`],
       });
       await publicClient.waitForTransactionReceipt({ hash: setTreasuryHash });
-      console.log(
-        "Treasury set to wallet address",
-        process.env.TREASURY_ADDRESS
-      );
+      console.log("Treasury set to", process.env.TREASURY_ADDRESS);
     }
 
-    // Add delay after setting treasury
+    // Delay to allow state propagation
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Add to beforeAll hook
-    const factoryCubeAddress = await publicClient.readContract({
+    // Verify the factory contract's incentive address
+    const factoryIncentiveAddress = await publicClient.readContract({
       ...factoryContract,
-      functionName: "i_cube",
+      functionName: "i_incentive",
     });
-    console.log("factoryCubeAddress", factoryCubeAddress);
-
-    if (factoryCubeAddress !== cubeContract.address) {
+    console.log("factoryIncentiveAddress", factoryIncentiveAddress);
+    if (factoryIncentiveAddress !== incentiveContract.address) {
       throw new Error(`
-        Factory contract is pointing to wrong CUBE address:
-        Expected: ${cubeContract.address}
-        Actual: ${factoryCubeAddress}
+        Factory contract is pointing to wrong Incentive address:
+        Expected: ${incentiveContract.address}
+        Actual: ${factoryIncentiveAddress}
       `);
     }
 
-    // Add token to escrow whitelist
+    // Whitelist the ERC20 token for the quest in the factory contract
     const whitelistTx = await walletClient.writeContract({
       ...factoryContract,
       functionName: "addTokenToWhitelist",
       args: [QUEST_ID, ERC20_TOKEN],
     });
     await publicClient.waitForTransactionReceipt({ hash: whitelistTx });
-    console.log("token whitelisted");
+    console.log("ERC20 token whitelisted");
 
-    // Add after each transaction
     const currentNonce = await publicClient.getTransactionCount({
       address: walletClient.account.address,
       blockTag: "pending",
@@ -243,32 +158,32 @@ describe("Cube SDK", () => {
       expect(isActive).toBe(true);
     });
 
-    it("should mint a new cube with valid signature", async () => {
+    it("should mint a new incentive with valid signature", async () => {
       const signature = await sdk.generateCubeSignature(TEST_CUBE_DATA);
-      const txHash = await sdk.mintCube(TEST_CUBE_DATA, signature);
+      const txHash = await sdk.claimReward(TEST_CUBE_DATA, signature);
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
       });
-      console.log("mint cube txHash", txHash);
-      console.log("mint cube receipt", receipt);
+      console.log("mint incentive txHash", txHash);
+      console.log("mint incentive receipt", receipt);
       expect(receipt.status).toBe("success");
     });
   }, 60_000);
 
   afterAll(async () => {
-    // Unpublish quest to withdraw funds
+    // Unpublish the quest to enable fund withdrawal
     const unpublishTxHash = await sdk.unpublishQuest(QUEST_ID);
     const unpublishReceipt = await publicClient.waitForTransactionReceipt({
       hash: unpublishTxHash,
     });
     expect(unpublishReceipt.status).toBe("success");
 
-    // Increase delay for state propagation
+    // Wait for state propagation
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const isActive = await sdk.isQuestActive(QUEST_ID);
     expect(isActive).toBe(false);
 
-    // Add delay between transactions
+    // Delay between transactions
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Get current nonce for ERC20 withdrawal
@@ -278,7 +193,7 @@ describe("Cube SDK", () => {
     });
     console.log("erc20Nonce", erc20Nonce);
 
-    // Withdraw ERC20 (remove nonce parameter)
+    // Withdraw ERC20 funds from the escrow
     const erc20WithdrawHash = await sdk.withdrawFromEscrow(
       QUEST_ID,
       walletClient.account.address,
@@ -288,28 +203,7 @@ describe("Cube SDK", () => {
     );
     await publicClient.waitForTransactionReceipt({ hash: erc20WithdrawHash });
 
-    // Get current nonce for NFT withdrawal
-    const nftNonce = await publicClient.getTransactionCount({
-      address: walletClient.account.address,
-      blockTag: "pending",
-    });
-    console.log("nftNonce", nftNonce);
-
-    // Withdraw NFT (remove nonce parameter)
-    const nftWithdrawHash = await sdk.withdrawFromEscrow(
-      QUEST_ID,
-      walletClient.account.address,
-      NFT_TOKEN,
-      NFT_ID,
-      TOKEN_TYPES.ERC721
-    );
-
-    const nftReceipt = await publicClient.waitForTransactionReceipt({
-      hash: nftWithdrawHash,
-    });
-    expect(nftReceipt.status).toBe("success");
-
-    // Verify final balance
+    // Verify the final ERC20 balance in the escrow is zero
     const escrow = await sdk.getEscrowContract(QUEST_ID);
     const finalBalance = await publicClient.readContract({
       ...escrow,

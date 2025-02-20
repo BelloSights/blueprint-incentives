@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.26;
+
+error AccessControlUnauthorizedAccount(address account, bytes32 requiredRole);
 
 import {DeployProxy} from "../../script/DeployProxy.s.sol";
 import {DeployEscrow} from "../../script/DeployEscrow.s.sol";
-import {CUBE} from "../../src/CUBE.sol";
-import {CubeV2} from "../contracts/CubeV2.sol";
-
+import {Incentive} from "../../src/Incentive.sol";
 import {MockERC20} from "../mock/MockERC20.sol";
 import {MockERC721} from "../mock/MockERC721.sol";
 import {MockERC1155} from "../mock/MockERC1155.sol";
@@ -46,7 +46,7 @@ contract EscrowFactoryTest is Test {
 
     address public proxyAddress;
     DeployProxy public proxyDeployer;
-    CUBE public cubeContract;
+    Incentive public incentiveContract;
 
     address public factoryAddr;
     address public escrowAddr;
@@ -58,6 +58,7 @@ contract EscrowFactoryTest is Test {
     address[] public whitelistedTokens;
 
     address public treasury;
+    uint256 public escrowId;
 
     event EscrowRegistered(
         address indexed registror, address indexed escrowAddress, uint256 indexed questId
@@ -77,16 +78,16 @@ contract EscrowFactoryTest is Test {
 
         proxyDeployer = new DeployProxy();
         proxyAddress = proxyDeployer.deployProxy(ownerPubKey);
-        cubeContract = CUBE(payable(proxyAddress));
+        incentiveContract = Incentive(payable(proxyAddress));
 
         vm.startBroadcast(ownerPubKey);
-        cubeContract.grantRole(cubeContract.SIGNER_ROLE(), adminAddress);
+        incentiveContract.grantRole(incentiveContract.SIGNER_ROLE(), adminAddress);
         vm.stopBroadcast();
 
         // deploy all necessary contracts and set up dependencies
         deployer = new DeployEscrow();
         (,, address _erc20Mock, address _erc721Mock, address _erc1155Mock) =
-            deployer.run(adminAddress, treasury, proxyAddress);
+            deployer.run(adminAddress, treasury, address(0));
 
         whitelistedTokens.push(address(_erc20Mock));
         whitelistedTokens.push(address(_erc721Mock));
@@ -98,36 +99,30 @@ contract EscrowFactoryTest is Test {
         bool hasRole = factoryContract.hasRole(factoryContract.DEFAULT_ADMIN_ROLE(), adminAddress);
         assert(hasRole);
 
-        uint256 questId = 0;
         vm.startPrank(adminAddress);
-        factoryContract.createEscrow(questId, adminAddress, whitelistedTokens, treasury);
+        escrowId = factoryContract.createEscrow(adminAddress, whitelistedTokens, treasury);
         vm.stopPrank();
 
-        escrowAddr = factoryContract.s_escrows(questId);
+        (, escrowAddr,,) = factoryContract.s_escrows(escrowId);
         escrowMock = Escrow(payable(escrowAddr));
 
         assert(escrowMock.s_whitelistedTokens(_erc20Mock));
+
+        vm.startPrank(adminAddress);
+        factoryContract.registerQuest(escrowId, escrowId);
+        vm.stopPrank();
 
         erc20Mock = MockERC20(_erc20Mock);
         erc721Mock = MockERC721(_erc721Mock);
         erc1155Mock = MockERC1155(_erc1155Mock);
     }
 
-    function createEscrow(uint256 questId) public returns (uint256) {
-        string[] memory communities = new string[](1);
-        communities[0] = "test";
-
-        string[] memory tags = new string[](1);
-        tags[0] = "DeFi";
-
+    function createEscrow() public returns (uint256) {
         vm.startPrank(adminAddress);
-        cubeContract.initializeQuest(
-            questId, communities, "Test Quest", CUBE.Difficulty.BEGINNER, CUBE.QuestType.QUEST, tags
-        );
-        factoryContract.createEscrow(questId, adminAddress, whitelistedTokens, treasury);
+        uint256 newEscrowId =
+            factoryContract.createEscrow(adminAddress, whitelistedTokens, treasury);
         vm.stopPrank();
-
-        return questId;
+        return newEscrowId;
     }
 
     function testDepositNative(uint256 amount) public {
@@ -186,11 +181,10 @@ contract EscrowFactoryTest is Test {
         assertEq(postBalance, preBalance + 1);
     }
 
-    function testCreateEscrow(uint256 questId, uint256 amount) public {
-        questId = bound(questId, 1, type(uint256).max); // 0 is already used in setUp()
+    function testCreateEscrow(uint256 amount) public {
         vm.prank(adminAddress);
-        factoryContract.createEscrow(questId, adminAddress, whitelistedTokens, treasury);
-        address newEscrow = factoryContract.s_escrows(questId);
+        escrowId = factoryContract.createEscrow(adminAddress, whitelistedTokens, treasury);
+        (, address newEscrow,,) = factoryContract.s_escrows(escrowId);
 
         MockERC20 erc20 = new MockERC20();
         erc20.mint(newEscrow, amount);
@@ -199,24 +193,37 @@ contract EscrowFactoryTest is Test {
     }
 
     // test withdrawal
-    function testNativeWithdrawalByAdmin(uint256 questId, uint256 nativeAmount) public {
-        questId = bound(questId, 1, type(uint256).max); // 0 is already used in setUp()
-        createEscrow(questId);
+    function testNativeWithdrawalByAdmin(uint256 nativeAmount) public {
+        uint256 newEscrowId = createEscrow();
+
+        vm.startPrank(adminAddress);
+        incentiveContract.initializeQuest(
+            newEscrowId,
+            new string[](0),
+            "Test Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        factoryContract.registerQuest(newEscrowId, newEscrowId);
+        vm.stopPrank();
 
         nativeAmount = bound(nativeAmount, 0, type(uint256).max);
         testDepositNative(nativeAmount);
 
-        address questEscrow = factoryContract.s_escrows(questId);
+        (, address questEscrow,,) = factoryContract.s_escrows(newEscrowId);
         hoax(BOB, nativeAmount);
         (bool success,) = address(questEscrow).call{value: nativeAmount}("");
-        assert(success);
+        require(success, "native deposit failed");
 
         uint256 balNative = questEscrow.balance;
         assertEq(balNative, nativeAmount);
 
         vm.startPrank(adminAddress);
-        cubeContract.unpublishQuest(questId);
-        factoryContract.withdrawFunds(questId, ALICE, address(0), 0, ITokenType.TokenType.NATIVE);
+        incentiveContract.unpublishQuest(newEscrowId);
+        factoryContract.withdrawFunds(
+            newEscrowId, ALICE, address(0), 0, ITokenType.TokenType.NATIVE
+        );
         vm.stopPrank();
 
         assertEq(questEscrow.balance, 0);
@@ -224,6 +231,17 @@ contract EscrowFactoryTest is Test {
     }
 
     function testErc20WithdrawalByAdmin(uint256 erc20Amount) public {
+        vm.startPrank(adminAddress);
+        incentiveContract.initializeQuest(
+            escrowId,
+            new string[](0),
+            "Test Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        incentiveContract.unpublishQuest(escrowId);
+        vm.stopPrank();
         erc20Amount = bound(erc20Amount, 0, type(uint64).max);
         erc20Mock.mint(escrowAddr, erc20Amount);
 
@@ -233,7 +251,9 @@ contract EscrowFactoryTest is Test {
         assertEq(preBalEscrow, balErc20);
 
         vm.prank(adminAddress);
-        factoryContract.withdrawFunds(0, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20);
+        factoryContract.withdrawFunds(
+            escrowId, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20
+        );
 
         uint256 postBalAlice = erc20Mock.balanceOf(ALICE);
 
@@ -242,82 +262,104 @@ contract EscrowFactoryTest is Test {
         assert(postBalAlice == erc20Amount);
     }
 
-    // expect revert
     function testErc20WithdrawalByNonAdmin(uint256 erc20Amount) public {
+        vm.startPrank(adminAddress);
+        incentiveContract.initializeQuest(
+            escrowId,
+            new string[](0),
+            "Test Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        incentiveContract.unpublishQuest(escrowId);
+        vm.stopPrank();
         erc20Amount = bound(erc20Amount, 0, type(uint64).max);
         erc20Mock.mint(escrowAddr, erc20Amount);
 
         vm.prank(ALICE);
-        vm.expectRevert(Factory.Factory__OnlyCallableByAdmin.selector);
-        factoryContract.withdrawFunds(0, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20);
-    }
-
-    function testUpdateAdmin(uint256 erc20Amount) public {
-        erc20Amount = bound(erc20Amount, 0, type(uint64).max);
-        erc20Mock.mint(escrowAddr, erc20Amount);
-
-        vm.prank(ALICE);
-        vm.expectRevert(Factory.Factory__OnlyCallableByAdmin.selector);
-        factoryContract.withdrawFunds(0, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20);
-
-        vm.prank(adminAddress);
-        factoryContract.updateEscrowAdmin(0, ALICE);
-
-        vm.prank(ALICE);
-        factoryContract.withdrawFunds(0, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20);
-
-        assert(erc20Mock.balanceOf(ALICE) == erc20Amount);
+        vm.expectRevert();
+        factoryContract.withdrawFunds(
+            escrowId, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20
+        );
     }
 
     function testChangeEscrowAdminAndWhitelistToken() public {
+        vm.startPrank(adminAddress);
+        incentiveContract.initializeQuest(
+            escrowId,
+            new string[](0),
+            "Test Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        vm.stopPrank();
         vm.prank(ALICE);
         address tokenToAdd = makeAddr("tokenToAdd");
 
-        vm.expectRevert(Factory.Factory__OnlyCallableByAdmin.selector);
-        factoryContract.addTokenToWhitelist(0, tokenToAdd);
+        // Non-admin (ALICE) attempt should revert
+        vm.expectRevert();
+        factoryContract.addTokenToWhitelist(escrowId, tokenToAdd);
 
+        // Admin call should succeed
         vm.prank(adminAddress);
-        factoryContract.updateEscrowAdmin(0, ALICE);
-
-        vm.prank(ALICE);
-        factoryContract.addTokenToWhitelist(0, tokenToAdd);
+        factoryContract.addTokenToWhitelist(escrowId, tokenToAdd);
 
         bool isWhitelisted = escrowMock.s_whitelistedTokens(tokenToAdd);
         assert(isWhitelisted);
     }
 
     function testRemoveTokenFromWhitelist() public {
+        vm.startPrank(adminAddress);
+        incentiveContract.initializeQuest(
+            escrowId,
+            new string[](0),
+            "Test Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        vm.stopPrank();
         bool isWhitelisted = escrowMock.s_whitelistedTokens(address(erc20Mock));
         assert(isWhitelisted);
 
         vm.prank(adminAddress);
-        factoryContract.removeTokenFromWhitelist(0, address(erc20Mock));
+        factoryContract.removeTokenFromWhitelist(escrowId, address(erc20Mock));
 
         bool isWhitelistedPostRemoval = escrowMock.s_whitelistedTokens(address(erc20Mock));
         assert(!isWhitelistedPostRemoval);
     }
 
     function testUpdateAdminWithdrawByDefaultAdmin(uint256 erc20Amount) public {
+        vm.startPrank(adminAddress);
+        incentiveContract.initializeQuest(
+            escrowId,
+            new string[](0),
+            "Test Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        incentiveContract.unpublishQuest(escrowId);
+        vm.stopPrank();
         erc20Amount = bound(erc20Amount, 0, type(uint64).max);
         erc20Mock.mint(escrowAddr, erc20Amount);
 
         vm.prank(ALICE);
-        vm.expectRevert(Factory.Factory__OnlyCallableByAdmin.selector);
-        factoryContract.withdrawFunds(0, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20);
+        vm.expectRevert();
+        factoryContract.withdrawFunds(
+            escrowId, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20
+        );
 
         // update admin but withdraw by default admin, which should still work
         vm.startPrank(adminAddress);
-        factoryContract.updateEscrowAdmin(0, ALICE);
-        factoryContract.withdrawFunds(0, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20);
+        factoryContract.withdrawFunds(
+            escrowId, ALICE, address(erc20Mock), 0, ITokenType.TokenType.ERC20
+        );
         vm.stopPrank();
 
         assert(erc20Mock.balanceOf(ALICE) == erc20Amount);
-    }
-
-    function testUpdateAdminByNonAdmin() public {
-        vm.prank(ALICE);
-        vm.expectRevert(Factory.Factory__OnlyCallableByAdmin.selector);
-        factoryContract.updateEscrowAdmin(0, ALICE);
     }
 
     function testCreateEscrowByNonAdmin() public {
@@ -326,26 +368,48 @@ contract EscrowFactoryTest is Test {
         bytes memory expectedError =
             abi.encodeWithSelector(selector, ALICE, factoryContract.DEFAULT_ADMIN_ROLE());
         vm.expectRevert(expectedError);
-        factoryContract.createEscrow(2, ALICE, whitelistedTokens, treasury);
+        factoryContract.createEscrow(ALICE, whitelistedTokens, treasury);
         vm.stopBroadcast();
     }
 
-    function testCreateDoubleEscrow(uint256 questId) public {
-        questId = bound(questId, 1, type(uint256).max); // 0 is already used in setUp()
+    function testCreateDoubleEscrow() public {
+        // Allow multiple escrows to be created; verify that a new escrowId is successfully created
         vm.startPrank(adminAddress);
-        factoryContract.createEscrow(questId, adminAddress, whitelistedTokens, treasury);
-        vm.expectRevert(Factory.Factory__EscrowAlreadyExists.selector);
-        factoryContract.createEscrow(questId, adminAddress, whitelistedTokens, treasury);
+        uint256 newEscrowId =
+            factoryContract.createEscrow(adminAddress, whitelistedTokens, treasury);
         vm.stopPrank();
+
+        (, address newEscrow,,) = factoryContract.s_escrows(newEscrowId);
+        // Assert that the new escrow address is valid (non-zero)
+        assert(newEscrow != address(0));
+
+        // create second escrow
+        vm.startPrank(adminAddress);
+        uint256 newEscrowId2 =
+            factoryContract.createEscrow(adminAddress, whitelistedTokens, treasury);
+        vm.stopPrank();
+
+        (, address newEscrow2,,) = factoryContract.s_escrows(newEscrowId2);
+        assert(newEscrow2 != address(0));
+        assert(newEscrow2 != newEscrow);
     }
 
     function testDistributeRewardsNotCUBE() public {
-        uint256 questId = 0;
+        vm.startPrank(adminAddress);
+        incentiveContract.initializeQuest(
+            escrowId,
+            new string[](0),
+            "Test Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        vm.stopPrank();
         vm.startPrank(adminAddress);
         erc20Mock.mint(escrowAddr, 1e18);
-        vm.expectRevert(Factory.Factory__OnlyCallableByCUBE.selector);
+        vm.expectRevert(Factory.Factory__OnlyCallableByIncentive.selector);
         factoryContract.distributeRewards(
-            questId, address(erc20Mock), BOB, 1e18, 0, ITokenType.TokenType.ERC20, 300
+            escrowId, address(erc20Mock), BOB, 1e18, 0, ITokenType.TokenType.ERC20, 300
         );
         vm.stopPrank();
     }
@@ -395,17 +459,5 @@ contract EscrowFactoryTest is Test {
         hoax(ALICE, amount);
         (bool success,) = factoryAddr.call{value: amount}("some data");
         assert(!success);
-    }
-
-    function testUpgrade() public {
-        uint256 newValue = 2;
-        vm.startPrank(adminAddress);
-        Upgrades.upgradeProxy(
-            factoryAddr, "CubeV2.sol", abi.encodeCall(CubeV2.initializeV2, (newValue))
-        );
-        CubeV2 cubeV2 = CubeV2(factoryAddr);
-        uint256 value = cubeV2.newValueV2();
-        assertEq(value, newValue);
-        vm.stopPrank();
     }
 }

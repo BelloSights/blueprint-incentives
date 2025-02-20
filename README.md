@@ -1,46 +1,125 @@
 <p align="center">
-   <br>
-     <a href="https://layer3.xyz" target="_blank">
-      <img width="300" height="55" src="./assets/layer3.png">
-     </a>
-   <br>
-   <br>
+  <br>
+  <a href="https://bp.fun" target="_blank">
+    <img width="300" height="100" src="./assets/blueprint.png" alt="Blueprint Logo">
+  </a>
+  <br><br>
 </p>
 
-[![Twitter](https://img.shields.io/twitter/follow/layer3xyz?color=blue&style=flat-square)](https://twitter.com/layer3xyz)
-[![Discord](https://img.shields.io/discord/884514862737281024?color=green&style=flat-square&logo=discord)](https://discord.com/invite/layer3)
-[![LICENSE](https://img.shields.io/badge/license-Apache--2.0-blue?logo=apache)](https://github.com/layer3xyz/cube-contracts/blob/main/LICENSE)
+[![Twitter](https://img.shields.io/twitter/follow/bpdotfun?color=blue&style=flat-square)](https://twitter.com/bpdotfun)
+[![LICENSE](https://img.shields.io/badge/license-Apache--2.0-blue?logo=apache)](./LICENSE)
 
+# bp.fun Contracts
+
+This repository contains a suite of upgradeable smart contracts that power the Blueprint ecosystem. The contracts include:
+
+- **BlueprintToken** – An ERC20 token (BP) with burn, permit, and UUPS upgradeability.
+- **Incentive** – A reward claim contract that uses EIP‑712 signatures to verify reward claims, enforce a daily reward cap, and trigger reward distribution via a factory.
+- **BlueprintStorefront** – A storefront contract that accepts payments (in BP tokens or ETH) for digital/physical items, splitting incoming funds among creator, buyback, and treasury wallets.
+- **Treasury** – A flexible, upgradeable treasury contract that holds BP tokens, ETH, and other ERC20 tokens and allows admin withdrawals or donations.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Smart Contract Details](#smart-contract-details)
+  - [BlueprintToken](#blueprinttoken)
+  - [Incentive](#incentive)
+  - [BlueprintStorefront](#blueprintstorefront)
+  - [Treasury](#treasury)
+- [Setup and Installation](#setup-and-installation)
+- [Deployment](#deployment)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+---
+
+## Overview
+
+Blueprint’s smart contract suite enables a storefront for creators with reward claims. The reward claim process is a fork of Layer3's [CUBE](https://github.com/layer3xyz/cubes) contract for reward distribution. The contracts are built with upgradeability (UUPS pattern) and leverage OpenZeppelin’s upgradeable libraries for security and reliability.
+
+---
+
+## Smart Contract Details
+
+### BlueprintToken
+
+- **Purpose:**  
+  Upgradeable ERC20 token with burn, permit, and owner-controlled upgrades.
+- **Key Features:**
+  - Uses UUPS upgradeability.
+  - Initial mint of 10 billion tokens sent to a treasury address.
+  - Incorporates ERC20Permit for gas-less approvals.
+- **File:** [BlueprintToken.sol](./src/BlueprintToken.sol)
+
+---
+
+### Incentive
+
+- **Purpose:**  
+  Processes reward claims by verifying EIP‑712–signed claim data and enforcing a 24-hour cooldown per quest.
+- **Key Features:**
+  - Verifies signature over a `IncentiveData` struct.
+  - Emits events for quest initialization, transaction logging, and reward distribution.
+  - Integrates with an escrow factory for reward distribution.
+- **File:** [Incentive.sol](./src/Incentive.sol)
+
+---
+
+### BlueprintStorefront
+
+- **Purpose:**  
+  A storefront to sell items (physical or digital) that accepts BP tokens or ETH. Payments are split among:
+  - **Buyback Wallet:** For buyback/liquidity purposes.
+  - **Creator Wallet:** Direct to content creator.
+  - **Blueprint Wallet:** Treasury.
+- **Key Features:**
+  - EIP‑712 signature–based purchase authorization.
+  - Item management with supply tracking and purchase history.
+  - Emergency withdrawal functionality.
+- **File:** [BlueprintStorefront.sol](./src/BlueprintStorefront.sol)
+
+---
+
+### Treasury
+
+- **Purpose:**  
+  Manages funds (BP tokens, ETH, or any ERC20) with admin-controlled withdrawals and donations.
+- **Key Features:**
+  - Supports direct ETH or token withdrawals.
+  - Uses UUPS upgradeability.
+  - Provides donation functionality.
+- **File:** [Treasury.sol](./src/Treasury.sol)
+
+---
+
+## Setup and Installation
+
+Ensure you have [Foundry](https://book.getfoundry.sh) installed and updated:
+
+```bash
+foundryup
 ```
-   ________  ______  ______
-  / ____/ / / / __ )/ ____/
- / /   / / / / __  / __/
-/ /___/ /_/ / /_/ / /___
-\____/\____/_____/_____/
-```
-
-# Introduction
-
-CUBEs, or Credentials to Unify Blockchain Events, are ERC-721 credentials that attest and unify multi-chain, multi-transaction, and multi-dapp quests onchain. As new ecosystems appear everyday, a simple way of querying impact and distributing rewards is necessary. CUBE lays the foundation for rewards in a world of 1,000,000 chains.
-
-<p align="center">
-   <br>
-   <br>
-     <a href="https://layer3.xyz" target="_blank">
-      <img width="400px" src="./assets/cube.png">
-     </a>
-   <br>
-   <br>
-</p>
 
 ## Install
 
 ```bash
 make install
+```
+
+Build the contracts:
+
+```bash
 make build
 ```
 
-### Deployment
+---
+
+## Deployment
+
+The contracts are designed for upgradeability and can be deployed using Forge scripts.
 
 ```bash
 make deploy_proxy ARGS="--network base_sepolia"
@@ -52,7 +131,7 @@ make deploy_escrow ARGS="--network base_sepolia"
 For proxy contracts, use this command after deployment (replace addresses with your values):
 
 ```bash
-forge verify-contract $DEPLOYED_FACTORY_PROXY_ADDRESS \
+forge verify-contract $FACTORY_PROXY_ADDRESS \
   --chain-id 84532 \
   --etherscan-api-key $BASESCAN_API_KEY \
   --constructor-args $(cast abi-encode "constructor(address,bytes)" $FACTORY_IMPLEMENTATION_ADDRESS 0x$(cast sig "initialize(address)" | cut -c3-)$(cast abi-encode "x(address)" $TREASURY_ADDRESS | cut -c3-)) \
@@ -62,104 +141,64 @@ forge verify-contract $DEPLOYED_FACTORY_PROXY_ADDRESS \
 ```
 
 Example initialization calldata generation:
+
 ```bash
 echo "0x$(cast sig "initialize(address)" | cut -c3-)$(cast abi-encode "x(address)" $TREASURY_ADDRESS | cut -c3-)"
 ```
 
-### Test
+For local development with Anvil:
+
+```bash
+anvil
+```
+
+In a new terminal, run:
+
+```bash
+forge script script/Anvil.s.sol --rpc-url http://localhost:8545 --private-key <ANVIL_PRIVATE_KEY> --broadcast --via-ir
+```
+
+---
+
+## Testing
+
+Run the complete test suite with:
 
 ```bash
 make test
 ```
 
-## Overview
+Or directly with Forge:
 
-Upon completing certain quests, users have the opportunity to mint a CUBE. This unique NFT encapsulates data from the quest, serving as a digital record of achievement. Check out an example of a minted CUBE on [Opensea](https://opensea.io/assets/base/0x1195cf65f83b3a5768f3c496d3a05ad6412c64b7/95).
-
-### Minting Process
-
-The minting process is initiated by a wallet with the _signer role_ creating an EIP-712 signature. This signature encapsulates all requisite data for the `mintCubes` function, ensuring the integrity and accuracy of the minting process. The user then broadcasts the transaction, including this signature and data. Minting transactions emit events in the smart contract that are captured onchain.
-
-### Quest Initialization
-
-When a new quest comes to life in our system, we call `initializeQuest`. This function is key—it broadcasts event data about the quest, such as participating communities (Layer3, Uniswap, 1Inch, etc.), the quest's difficulty level (beginner, intermediate, advanced), title, and more.
-
-## CUBE Smart Contract Details
-
-#### Key Features
-
-- EIP712 Signatures: Utilizes EIP712 to sign data.
-- Analytics: Events emitted by the contract are captured for analytics.
-- Referral System: Incorporates a referral mechanism in the minting process.
-
-#### Deployment Details
-
-- Contract Name: CUBE
-- Compiler Version: 0.8.20
-- Optimizations: Yes, 10,000 runs.
-
-#### Roles and Permissions
-
-- Default Admin: Full control over the contract and can handle the different roles.
-- Signer: Authorized to initialize quests and sign cube data for minting.
-- Upgrader: Can upgrade the contract
-
-## Token Reward System
-
-### Overview
-
-The Layer3 Token Reward System automates the distribution of token rewards upon the completion of onchain events. This system is empowered by two primary smart contracts, [Factory.sol](./src/escrow/Factory.sol) and [Escrow.sol](./src/escrow/Escrow.sol), which work in tandem with [CUBE.sol](./src/CUBE.sol) to handle the lifecycle of reward distribution. Used with CUBEs, this is the first mechanism that supports token rewards for multichain interactions.
-
-### Contracts
-
-### Factory
-
-[Factory.sol](./src/escrow/Factory.sol) serves as a factory hub within the Layer3 Token Reward System, and is responsible of creating individual [Escrow.sol](./src/escrow/Escrow.sol) contracts for each new quest. These escrow contracts are where the token rewards are stored and from which they are distributed to the users upon quest completion.
-
-#### Key Functions
-
-- **createEscrow**: Deploys a new [Escrow.sol](./src/escrow/Escrow.sol) instance with specified admin and whitelisted tokens for a given quest ID.
-- **updateEscrowAdmin**: Allows changing the admin of an escrow.
-- **withdrawFunds**: Withdraws funds from the escrow when a quest is inactive, supporting various token types.
-- **distributeRewards**: Sends out rewards from escrow when called by the CUBE contract.
-
-### Escrow
-
-[Escrow.sol](./src/escrow/Escrow.sol) acts as a holding mechanism for tokens until they are rewarded to users upon quest completion. It is designed to support various token standards including ERC20, ERC721, and ERC1155.
-
-#### Key Functions
-
-- **addTokenToWhitelist**: Enables a token to be used within the escrow.
-- **removeTokenFromWhitelist**: Disables the use of a token within the escrow.
-- **withdrawERC20**, **withdrawERC721**, **withdrawERC1155**, **withdrawNative**: Allow the withdrawal of rewards to a specified recipient, applying a rake as defined.
-
-### Workflow
-
-1. **Quest Initiation**: When creating a new quest that should contain a token reward, the creator additionally creates a unique [Escrow.sol](./src/escrow/Escrow.sol) for the quest by calling [Factory.sol](./src/escrow/Factory.sol).
-2. **Reward Funding**: The created [Escrow.sol](./src/escrow/Escrow.sol) contract is then funded with the appropriate tokens that will be awarded to the users completing the quest.
-3. **Quest Completion**: After users complete the quest and mint their CUBEs, the [CUBE.sol](./src/CUBE.sol) contract calls the **distributeRewards** function inside [Factory.sol](./src/escrow/Factory.sol), which triggers [Escrow.sol](./src/escrow/Escrow.sol) to make a push payment to the user.
+```bash
+forge install
+forge test
+```
 
 ---
 
-### Audits
+## SDK
 
-In December 2023 [CUBE.sol](./src/CUBE.sol) was audited by Sherlock. Find the report [here](./audit/cube/sherlock_december_2023.pdf).
+To generate the SDK ABIs, run the following commands:
 
-In March 2024, both [Factory.sol](./src/escrow/Factory.sol) and [Escrow.sol](./src/escrow/Escrow.sol) were audited by Three Sigma. Find the report [here](./audit/escrow/three_sigma_march_2024.pdf).
+```bash
+jq '.abi' out/Incentive.sol/Incentive.json > sdk/abis/incentiveAbi.json
+jq '.abi' out/Escrow.sol/Escrow.json > sdk/abis/escrowAbi.json
+jq '.abi' out/Factory.sol/Factory.json > sdk/abis/factoryAbi.json
+jq '.abi' out/BlueprintToken.sol/BlueprintToken.json > sdk/abis/blueprintTokenAbi.json
+jq '.abi' out/BlueprintStorefront.sol/BlueprintStorefront.json > sdk/abis/blueprintStorefrontAbi.json
+```
 
-### Bug Bounty Program
+## Troubleshooting
 
-| Severity Level | Description                                                                                                                    | Examples                                                                                                 | Maximum Bounty |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------------- |
-| **Critical**   | Bugs that could lead to substantial theft or loss of tokens, or severe damage to the protocol's integrity.                     | Exploits allowing unauthorized token transfers or contract manipulations.                                | Contact Us     |
-| **High**       | Issues that can affect the functionality of the CUBEs contracts but don't directly lead to a loss of funds.                    | Temporary inability to claim or transfer CUBEs, manipulation of non-critical contract states.            | Up to 5 ETH    |
-| **Medium**     | Bugs that cause inconvenience or unexpected behavior, but with limited impact on the overall security and functionality.       | Contracts using excessive gas, causing inefficiency or denial of service without direct economic damage. | Up to 2.5 ETH  |
-| **Low**        | Non-critical issues that relate to best practices, code optimization, or failings that have a minor impact on user experience. | Sub-optimal contract performance, failure to meet standards or best practices without economic risk.     | Up to 0.5 ETH  |
+- **Foundry Installation Issues:**  
+  If you encounter “Permission Denied” errors during `forge install`, ensure your GitHub SSH keys are correctly added. Refer to [GitHub SSH documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh).
 
-_Note: All bounties are at the discretion of the Layer3 team and will be awarded based on the severity, impact, and quality of the report. To claim a bounty, a detailed report including proof of concept is required. For submissions or inquiries, please email us at [security@layer3.xyz](mailto:security@layer3.xyz)._
+- **Deployment Failures:**  
+  Ensure that the correct flags and salt values are used (especially for CREATE2 deployments) and verify that your deployer address matches the expected CREATE2 proxy address if applicable.
 
 ---
 
-### License
+## License
 
-This repo is released under the Apache 2 license, see [LICENSE](./LICENSE) for more details. However, some files are licensed under MIT, such as the test and script files.                                                       
+This repository is released under the [Apache 2.0 License](./LICENSE). Some files (such as tests and scripts) may be licensed under MIT.

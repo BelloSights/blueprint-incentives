@@ -8,13 +8,13 @@
         \/    \/\/         \/            \/
 */
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.26;
 
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
-import {IERC1155} from "@openzeppelin/contracts/interfaces/IERC1155.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712} from "@openzeppelin-contracts/utils/cryptography/EIP712.sol";
+import {IERC20} from "@openzeppelin-contracts/interfaces/IERC20.sol";
+import {IERC721} from "@openzeppelin-contracts/interfaces/IERC721.sol";
+import {IERC1155} from "@openzeppelin-contracts/interfaces/IERC1155.sol";
+import {ECDSA} from "@openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {Escrow} from "./Escrow.sol";
 import {ITokenType} from "./interfaces/ITokenType.sol";
 

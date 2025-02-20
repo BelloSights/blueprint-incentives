@@ -3,9 +3,9 @@ export const factoryAbi = [
     type: "constructor",
     inputs: [
       {
-        name: "cube",
+        name: "incentive",
         type: "address",
-        internalType: "contract CUBE",
+        internalType: "contract Incentive",
       },
     ],
     stateMutability: "nonpayable",
@@ -59,12 +59,7 @@ export const factoryAbi = [
     name: "createEscrow",
     inputs: [
       {
-        name: "questId",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "admin",
+        name: "creator",
         type: "address",
         internalType: "address",
       },
@@ -77,6 +72,25 @@ export const factoryAbi = [
         name: "treasury",
         type: "address",
         internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "disableEscrow",
+    inputs: [
+      {
+        name: "escrowId",
+        type: "uint256",
+        internalType: "uint256",
       },
     ],
     outputs: [],
@@ -124,6 +138,38 @@ export const factoryAbi = [
     ],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "enableEscrow",
+    inputs: [
+      {
+        name: "escrowId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getEscrow",
+    inputs: [
+      {
+        name: "questId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -188,13 +234,13 @@ export const factoryAbi = [
   },
   {
     type: "function",
-    name: "i_cube",
+    name: "i_incentive",
     inputs: [],
     outputs: [
       {
         name: "",
         type: "address",
-        internalType: "contract CUBE",
+        internalType: "contract Incentive",
       },
     ],
     stateMutability: "view",
@@ -224,6 +270,24 @@ export const factoryAbi = [
       },
     ],
     stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "registerQuest",
+    inputs: [
+      {
+        name: "questId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "escrowId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -281,25 +345,6 @@ export const factoryAbi = [
   },
   {
     type: "function",
-    name: "s_escrow_admin",
-    inputs: [
-      {
-        name: "",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [
-      {
-        name: "",
-        type: "address",
-        internalType: "address",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
     name: "s_escrows",
     inputs: [
       {
@@ -310,9 +355,56 @@ export const factoryAbi = [
     ],
     outputs: [
       {
-        name: "",
+        name: "escrowId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "escrow",
         type: "address",
         internalType: "address",
+      },
+      {
+        name: "creator",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "active",
+        type: "bool",
+        internalType: "bool",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "s_nextEscrowId",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "s_questToEscrow",
+    inputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
       },
     ],
     stateMutability: "view",
@@ -335,24 +427,6 @@ export const factoryAbi = [
       },
     ],
     stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "updateEscrowAdmin",
-    inputs: [
-      {
-        name: "questId",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "newAdmin",
-        type: "address",
-        internalType: "address",
-      },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -407,25 +481,26 @@ export const factoryAbi = [
   },
   {
     type: "event",
-    name: "EscrowAdminUpdated",
+    name: "EscrowDisabled",
     inputs: [
       {
-        name: "updater",
-        type: "address",
-        indexed: true,
-        internalType: "address",
-      },
-      {
-        name: "questId",
+        name: "escrowId",
         type: "uint256",
         indexed: true,
         internalType: "uint256",
       },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "EscrowEnabled",
+    inputs: [
       {
-        name: "newAdmin",
-        type: "address",
+        name: "escrowId",
+        type: "uint256",
         indexed: true,
-        internalType: "address",
+        internalType: "uint256",
       },
     ],
     anonymous: false,
@@ -441,16 +516,22 @@ export const factoryAbi = [
         internalType: "address",
       },
       {
-        name: "escrowAddress",
+        name: "escrowId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
+      },
+      {
+        name: "escrow",
         type: "address",
         indexed: true,
         internalType: "address",
       },
       {
-        name: "questId",
-        type: "uint256",
-        indexed: true,
-        internalType: "uint256",
+        name: "creator",
+        type: "address",
+        indexed: false,
+        internalType: "address",
       },
     ],
     anonymous: false,
@@ -513,6 +594,25 @@ export const factoryAbi = [
         type: "uint64",
         indexed: false,
         internalType: "uint64",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "QuestRegistered",
+    inputs: [
+      {
+        name: "questId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
+      },
+      {
+        name: "escrowId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
     ],
     anonymous: false,
@@ -698,7 +798,7 @@ export const factoryAbi = [
   },
   {
     type: "error",
-    name: "Factory__CUBEQuestIsActive",
+    name: "Factory__IncentiveQuestIsActive",
     inputs: [],
   },
   {
@@ -708,7 +808,12 @@ export const factoryAbi = [
   },
   {
     type: "error",
-    name: "Factory__NoQuestEscrowFound",
+    name: "Factory__EscrowDisabled",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "Factory__NoEscrowForId",
     inputs: [],
   },
   {
@@ -718,7 +823,17 @@ export const factoryAbi = [
   },
   {
     type: "error",
-    name: "Factory__OnlyCallableByCUBE",
+    name: "Factory__OnlyCallableByIncentive",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "Factory__QuestAlreadyRegistered",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "Factory__QuestNotRegistered",
     inputs: [],
   },
   {
@@ -728,7 +843,7 @@ export const factoryAbi = [
   },
   {
     type: "error",
-    name: "FailedInnerCall",
+    name: "FailedCall",
     inputs: [],
   },
   {

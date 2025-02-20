@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.26;
 
 import {ITokenType} from "./ITokenType.sol";
-import {CUBE} from "../../CUBE.sol";
+import {Incentive} from "../../Incentive.sol";
 
 interface IFactory is ITokenType {
     function distributeRewards(
@@ -24,16 +24,22 @@ interface IFactory is ITokenType {
     ) external;
 
     function createEscrow(
-        uint256 questId,
-        address admin,
+        address creator,
         address[] memory whitelistedTokens,
         address treasury
-    ) external;
-
-    function updateEscrowAdmin(uint256 questId, address newAdmin) external;
+    ) external returns (uint256);
 
     function addTokenToWhitelist(uint256 questId, address token) external;
     function removeTokenFromWhitelist(uint256 questId, address token) external;
 
     function initialize(address admin) external;
+
+    function s_escrows(uint256 escrowId)
+        external
+        view
+        returns (uint256 escrowId_, address escrow, address creator, bool active);
+
+    function s_questToEscrow(uint256 questId) external view returns (uint256);
+
+    function getEscrow(uint256 questId) external view returns (address);
 }

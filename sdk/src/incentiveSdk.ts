@@ -1,8 +1,8 @@
 import { Address, PublicClient, WalletClient } from "viem";
 import { escrowAbi, factoryAbi } from "../abis";
-import { BPCUBE, cubeContract, factoryContract } from "./viem";
+import { factoryContract, Incentive, incentiveContract } from "./viem";
 
-export class CubeSDK {
+export class IncentiveSDK {
   private publicClient: PublicClient;
   private walletClient: WalletClient;
 
@@ -14,29 +14,52 @@ export class CubeSDK {
   // Factory Methods
   async createEscrow(
     questId: bigint,
-    admin: Address,
     whitelistedTokens: Address[],
     treasury: Address
   ) {
     const { address, abi, chain } = factoryContract;
-    const account = this.walletClient.account ?? null;
-    return this.walletClient.writeContract({
+    const account = this.walletClient.account?.address;
+    if (!account) throw new Error("Wallet account not available");
+
+    // Call createEscrow with the caller as creator
+    const escrowIdTx = await this.walletClient.writeContract({
       address,
       abi,
       chain,
       account,
       functionName: "createEscrow",
-      args: [questId, admin, whitelistedTokens, treasury],
+      args: [account, whitelistedTokens, treasury],
     });
+    // (Assume the returned value is the escrow ID.)
+    const escrowId = escrowIdTx as unknown as bigint;
+
+    // Register the quest with the new escrow ID
+    await this.walletClient.writeContract({
+      address,
+      abi,
+      chain,
+      account,
+      functionName: "registerQuest",
+      args: [questId, escrowId],
+    });
+
+    return escrowId;
   }
 
   async getEscrowAddress(questId: bigint): Promise<Address> {
-    const address = await this.publicClient.readContract({
+    // First, retrieve the escrow ID for this quest
+    const escrowId = await this.publicClient.readContract({
       ...factoryContract,
-      functionName: "s_escrows",
+      functionName: "s_questToEscrow",
       args: [questId],
     });
-    return address as Address;
+    // Then, get the escrow info using that escrow ID
+    const escrowInfo = await this.publicClient.readContract({
+      ...factoryContract,
+      functionName: "s_escrows",
+      args: [escrowId],
+    });
+    return escrowInfo[1];
   }
 
   async distributeRewards(
@@ -82,10 +105,7 @@ export class CubeSDK {
     const account = this.walletClient.account ?? null;
     return this.walletClient.writeContract({
       address,
-      abi: [
-        ...factoryAbi,
-        ...escrowAbi,
-      ],
+      abi: [...factoryAbi, ...escrowAbi],
       chain,
       account,
       functionName: "withdrawFunds",
@@ -94,7 +114,7 @@ export class CubeSDK {
     });
   }
 
-  // Cube Methods
+  // Incentive Methods
   async initializeQuest(
     questId: bigint,
     communities: string[],
@@ -106,80 +126,56 @@ export class CubeSDK {
     if (!this.walletClient.account) {
       throw new Error("Wallet account not available");
     }
-    console.log(
-      "this.walletClient.account.address",
-      this.walletClient.account.address
-    );
+    console.log("Wallet address:", this.walletClient.account.address);
 
-    // Verify and grant role using factory contract
+    // Verify and grant role using the incentive contract
     const account = this.walletClient.account.address;
     const SIGNER_ROLE = await this.publicClient.readContract({
-      ...cubeContract,
+      ...incentiveContract,
       functionName: "SIGNER_ROLE",
     });
     console.log("SIGNER_ROLE", SIGNER_ROLE);
 
-    // Check if account already has role
+    // Check if the account already has the role
     const hasRole = await this.publicClient.readContract({
-      ...cubeContract,
+      ...incentiveContract,
       functionName: "hasRole",
       args: [SIGNER_ROLE, account],
     });
-
     console.log("hasRole", hasRole);
 
     if (!hasRole) {
       await this.grantRole(account);
-      // Wait for role propagation
+      // Wait briefly for role propagation
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
-    // Proceed with initialization
+    // Initialize the quest
     return this.walletClient.writeContract({
-      ...cubeContract,
+      ...incentiveContract,
       account: this.walletClient.account,
       functionName: "initializeQuest",
       args: [questId, communities, title, difficulty, questType, tags],
     });
   }
 
-  async mintCube(cubeData: BPCUBE, signature: `0x${string}`) {
+  async claimReward(incentiveData: Incentive, signature: `0x${string}`) {
     if (!this.walletClient.account) {
       throw new Error("Wallet account not available");
     }
-    // simulate transactions first
-    // const tx = await this.publicClient.simulateContract({
-    //   ...cubeContract,
-    //   abi: [
-    //     ...cubeContract.abi,
-    //     ...factoryAbi,
-    //     ...escrowAbi,
-    //   ],
-    //   functionName: "mintCube",
-    //   args: [cubeData, signature],
-    //   value: cubeData.isNative ? cubeData.price : 0n,
-    //   gas: 5_000_000n,
-    // });
-    // check if tx causes issues
-
+    // New claimReward is nonpayable so we do not send native value
     return this.walletClient.writeContract({
-      ...cubeContract,
-      abi: [
-        ...cubeContract.abi,
-        ...factoryAbi,
-        ...escrowAbi,
-      ],
+      ...incentiveContract,
+      abi: [...incentiveContract.abi, ...factoryAbi, ...escrowAbi],
       account: this.walletClient.account,
-      functionName: "mintCube",
-      args: [cubeData, signature],
-      value: cubeData.isNative ? cubeData.price : 0n,
-      gas: 5_000_000n,
+      functionName: "claimReward",
+      args: [incentiveData, signature],
     });
   }
 
   async isQuestActive(questId: bigint): Promise<boolean> {
     const active = await this.publicClient.readContract({
-      ...cubeContract,
+      ...incentiveContract,
       functionName: "isQuestActive",
       args: [questId],
     });
@@ -192,23 +188,28 @@ export class CubeSDK {
   }
 
   async getCubeContract() {
-    return cubeContract;
+    return incentiveContract;
   }
 
   async getEscrowContract(questId: bigint) {
-    const escrowAddress = await this.publicClient.readContract({
+    const escrowId = await this.publicClient.readContract({
       ...factoryContract,
-      functionName: "s_escrows",
+      functionName: "s_questToEscrow",
       args: [questId],
     });
+    const escrowInfo = await this.publicClient.readContract({
+      ...factoryContract,
+      functionName: "s_escrows",
+      args: [escrowId],
+    });
     return {
-      address: escrowAddress as Address,
+      address: escrowInfo[1],
       abi: escrowAbi,
     };
   }
 
   async unpublishQuest(questId: bigint) {
-    const { address, abi, chain } = cubeContract;
+    const { address, abi, chain } = incentiveContract;
     const account = this.walletClient.account ?? null;
     return this.walletClient.writeContract({
       address,
@@ -220,42 +221,33 @@ export class CubeSDK {
     });
   }
 
-  async generateCubeSignature(cubeData: BPCUBE) {
+  async generateCubeSignature(incentiveData: Incentive) {
     if (!this.walletClient.account) {
       throw new Error("Wallet account not available");
     }
-
     const chainId = await this.publicClient.getChainId();
 
-    // Define EIP-712 domain and types
+    // Define the EIP‑712 domain and types for the new IncentiveData structure
     const domain = {
       name: "BLUEPRINT",
       version: "1",
       chainId: chainId,
-      verifyingContract: cubeContract.address,
+      verifyingContract: incentiveContract.address,
     };
 
     const types = {
-      CubeData: [
+      IncentiveData: [
         { name: "questId", type: "uint256" },
         { name: "nonce", type: "uint256" },
-        { name: "price", type: "uint256" },
-        { name: "isNative", type: "bool" },
         { name: "toAddress", type: "address" },
         { name: "walletProvider", type: "string" },
-        { name: "tokenURI", type: "string" },
         { name: "embedOrigin", type: "string" },
         { name: "transactions", type: "TransactionData[]" },
-        { name: "recipients", type: "FeeRecipient[]" },
         { name: "reward", type: "RewardData" },
       ],
       TransactionData: [
         { name: "txHash", type: "string" },
         { name: "networkChainId", type: "string" },
-      ],
-      FeeRecipient: [
-        { name: "recipient", type: "address" },
-        { name: "BPS", type: "uint16" },
       ],
       RewardData: [
         { name: "tokenAddress", type: "address" },
@@ -268,13 +260,12 @@ export class CubeSDK {
       ],
     };
 
-    // Use signTypedData instead of manual hashing
     return this.walletClient.signTypedData({
       account: this.walletClient.account,
       domain,
       types,
-      primaryType: "CubeData",
-      message: cubeData,
+      primaryType: "IncentiveData",
+      message: incentiveData,
     });
   }
 
@@ -283,14 +274,12 @@ export class CubeSDK {
       throw new Error("Wallet account not available");
     }
     const SIGNER_ROLE = await this.publicClient.readContract({
-      ...cubeContract,
+      ...incentiveContract,
       functionName: "SIGNER_ROLE",
     });
-
     console.log("SIGNER_ROLE", SIGNER_ROLE);
-
     return this.walletClient.writeContract({
-      ...cubeContract,
+      ...incentiveContract,
       account: this.walletClient.account,
       functionName: "grantRole",
       args: [SIGNER_ROLE, account],

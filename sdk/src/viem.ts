@@ -8,8 +8,11 @@ import {
   http,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { cubeAbi } from "../abis/cubeAbi";
+import { blueprintStorefrontAbi } from "../abis/blueprintStorefrontAbi";
+import { blueprintTokenAbi } from "../abis/blueprintTokenAbi";
 import { factoryAbi } from "../abis/factoryAbi";
+import { incentiveAbi } from "../abis/incentiveAbi";
+import { treasuryAbi } from "../abis/treasuryAbi";
 
 dotenv.config({
   path: path.resolve(__dirname, "../../.env"),
@@ -33,17 +36,13 @@ export const DIFFICULTIES = {
   ADVANCED: 2,
 } as const;
 
-export type BPCUBE = {
+export type Incentive = {
   questId: bigint;
   nonce: bigint;
-  price: bigint;
-  isNative: boolean;
   toAddress: Address;
   walletProvider: string;
-  tokenURI: string;
   embedOrigin: string;
   transactions: { txHash: string; networkChainId: string }[];
-  recipients: { recipient: Address; BPS: number }[];
   reward: {
     tokenAddress: Address;
     chainId: bigint;
@@ -57,21 +56,35 @@ export type BPCUBE = {
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
 const BASE_SEPOLIA_RPC = process.env.BASE_SEPOLIA_RPC;
-const DEPLOYED_CUBE_PROXY_ADDRESS = process.env
-  .DEPLOYED_CUBE_PROXY_ADDRESS as `0x${string}`;
-const DEPLOYED_FACTORY_PROXY_ADDRESS = process.env
-  .DEPLOYED_FACTORY_PROXY_ADDRESS as `0x${string}`;
+const INCENTIVE_PROXY_ADDRESS = process.env.INCENTIVE_PROXY_ADDRESS as `0x${string}`;
+const FACTORY_PROXY_ADDRESS = process.env
+  .FACTORY_PROXY_ADDRESS as `0x${string}`;
+const STOREFRONT_PROXY_ADDRESS = process.env
+  .STOREFRONT_PROXY_ADDRESS as `0x${string}`;
+const BLUEPRINT_TOKEN_ADDRESS = process.env
+  .BLUEPRINT_TOKEN_ADDRESS as `0x${string}`;
+const TREASURY_ADDRESS = process.env.TREASURY_ADDRESS as `0x${string}`;
+
 if (!PRIVATE_KEY) {
   throw new Error("PRIVATE_KEY is not set");
 }
 if (!BASE_SEPOLIA_RPC) {
   throw new Error("BASE_SEPOLIA_RPC is not set");
 }
-if (!DEPLOYED_CUBE_PROXY_ADDRESS) {
-  throw new Error("DEPLOYED_CUBE_PROXY_ADDRESS is not set");
+if (!TREASURY_ADDRESS) {
+  throw new Error("TREASURY_ADDRESS is not set");
 }
-if (!DEPLOYED_FACTORY_PROXY_ADDRESS) {
-  throw new Error("DEPLOYED_FACTORY_PROXY_ADDRESS is not set");
+if (!INCENTIVE_PROXY_ADDRESS) {
+  throw new Error("INCENTIVE_PROXY_ADDRESS is not set");
+}
+if (!FACTORY_PROXY_ADDRESS) {
+  throw new Error("FACTORY_PROXY_ADDRESS is not set");
+}
+if (!STOREFRONT_PROXY_ADDRESS) {
+  throw new Error("STOREFRONT_PROXY_ADDRESS is not set");
+}
+if (!BLUEPRINT_TOKEN_ADDRESS) {
+  throw new Error("BLUEPRINT_TOKEN_ADDRESS is not set");
 }
 
 // Define Base Sepolia chain configuration
@@ -107,16 +120,37 @@ export const walletClient = createWalletClient({
 });
 
 // Contract instances
-console.log(DEPLOYED_CUBE_PROXY_ADDRESS);
-export const cubeContract = {
-  address: DEPLOYED_CUBE_PROXY_ADDRESS,
-  abi: cubeAbi,
+console.log("Incentive contract address:", INCENTIVE_PROXY_ADDRESS);
+export const incentiveContract = {
+  address: INCENTIVE_PROXY_ADDRESS,
+  abi: incentiveAbi,
   chain: baseSepolia,
 };
 
-console.log(DEPLOYED_FACTORY_PROXY_ADDRESS);
+console.log("Factory contract address:", FACTORY_PROXY_ADDRESS);
 export const factoryContract = {
-  address: DEPLOYED_FACTORY_PROXY_ADDRESS,
+  address: FACTORY_PROXY_ADDRESS,
   abi: factoryAbi,
+  chain: baseSepolia,
+};
+
+console.log("Storefront contract address:", STOREFRONT_PROXY_ADDRESS);
+export const storefrontContract = {
+  address: STOREFRONT_PROXY_ADDRESS,
+  abi: blueprintStorefrontAbi,
+  chain: baseSepolia,
+};
+
+console.log("Blueprint token address:", BLUEPRINT_TOKEN_ADDRESS);
+export const blueprintTokenContract = {
+  address: BLUEPRINT_TOKEN_ADDRESS,
+  abi: blueprintTokenAbi,
+  chain: baseSepolia,
+};
+
+console.log("Treasury contract address:", TREASURY_ADDRESS);
+export const treasuryContract = {
+  address: TREASURY_ADDRESS,
+  abi: treasuryAbi,
   chain: baseSepolia,
 };
