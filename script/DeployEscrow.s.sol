@@ -23,7 +23,7 @@ contract DeployEscrow is Script {
         0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
     uint256 public deployerKey;
 
-    uint256 public constant QUEST_ID = 1;
+    uint256 public constant QUEST_ID = 3;
 
     Factory public factoryContract;
     address erc20Mock;
@@ -50,12 +50,21 @@ contract DeployEscrow is Script {
         if (incentive == address(0)) {
             revert("Incentive address is required");
         }
+        address creator = vm.envAddress("CREATOR_ADDRESS");
+        if (creator == address(0)) {
+            revert("Creator address is required");
+        }
         // address blueprintToken = vm.envAddress("BLUEPRINT_TOKEN_ADDRESS");
         // if (blueprintToken == address(0)) {
         //     revert("Blueprint token address is required");
         // }
 
-        address factory = deployFactory(deployer, incentive);
+        // address factory = deployFactory(deployer, incentive);
+        address factory = vm.envAddress("FACTORY_PROXY_ADDRESS");
+        if (factory == address(0)) {
+            revert("Factory address is required");
+        }
+
         factoryContract = Factory(factory);
 
         address[] memory whitelistedTokens = new address[](0);
@@ -64,7 +73,7 @@ contract DeployEscrow is Script {
         vm.startBroadcast(deployer);
         uint256 registeredQuest = factoryContract.s_questToEscrow(QUEST_ID);
         if (registeredQuest == 0) {
-            uint256 escrowId = factoryContract.createEscrow(deployer, whitelistedTokens, treasury);
+            uint256 escrowId = factoryContract.createEscrow(creator, whitelistedTokens, treasury);
             factoryContract.registerQuest(QUEST_ID, escrowId);
         } else {
             console.log("DeployEscrow: Quest", QUEST_ID, "already registered.");

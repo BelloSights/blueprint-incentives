@@ -1,6 +1,6 @@
-import { Address, PublicClient, WalletClient } from "viem";
+import type { Address, PublicClient, WalletClient } from "viem";
 import { escrowAbi, factoryAbi } from "../abis";
-import { factoryContract, Incentive, incentiveContract } from "./viem";
+import { type Incentive, factoryContract, incentiveContract } from "./viem";
 
 export class IncentiveSDK {
   private publicClient: PublicClient;
