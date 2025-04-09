@@ -71,9 +71,6 @@ if (!PRIVATE_KEY) {
 if (!BASE_SEPOLIA_RPC) {
   throw new Error("BASE_SEPOLIA_RPC is not set");
 }
-if (!TREASURY_ADDRESS) {
-  throw new Error("TREASURY_ADDRESS is not set");
-}
 if (!INCENTIVE_PROXY_ADDRESS) {
   throw new Error("INCENTIVE_PROXY_ADDRESS is not set");
 }

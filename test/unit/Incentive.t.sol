@@ -151,7 +151,7 @@ contract IncentiveTest is Test {
     }
 
     function _mintIncentive() internal {
-        Incentive.IncentiveData memory _data = helper.getCubeData(
+        Incentive.IncentiveData memory _data = helper.getIncentiveData(
             makeAddr("mintTo"),
             address(factoryContract),
             address(erc20Mock),
@@ -254,7 +254,7 @@ contract IncentiveTest is Test {
         uint256 rakeBps,
         uint256 chainId
     ) internal view returns (Incentive.IncentiveData memory, bytes memory) {
-        Incentive.IncentiveData memory _data = helper.getCubeData(
+        Incentive.IncentiveData memory _data = helper.getIncentiveData(
             BOB, address(factoryContract), token, tokenId, amount, tokenType, rakeBps, chainId
         );
 
@@ -272,7 +272,7 @@ contract IncentiveTest is Test {
         view
         returns (Incentive.IncentiveData memory, bytes memory)
     {
-        Incentive.IncentiveData memory _data = helper.getCubeData(
+        Incentive.IncentiveData memory _data = helper.getIncentiveData(
             BOB,
             address(factoryContract),
             address(erc20Mock),
@@ -449,7 +449,7 @@ contract IncentiveTest is Test {
     }
 
     function testNonceReuse() public {
-        Incentive.IncentiveData memory data = helper.getCubeData(
+        Incentive.IncentiveData memory data = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -459,7 +459,7 @@ contract IncentiveTest is Test {
             0,
             137
         );
-        Incentive.IncentiveData memory data2 = helper.getCubeData(
+        Incentive.IncentiveData memory data2 = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -489,7 +489,7 @@ contract IncentiveTest is Test {
     }
 
     function testIncentiveMintDifferentSigners() public {
-        Incentive.IncentiveData memory data = helper.getCubeData(
+        Incentive.IncentiveData memory data = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -499,7 +499,7 @@ contract IncentiveTest is Test {
             0,
             137
         );
-        Incentive.IncentiveData memory data2 = helper.getCubeData(
+        Incentive.IncentiveData memory data2 = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -530,7 +530,7 @@ contract IncentiveTest is Test {
     }
 
     function testMultipleIncentiveDataMint() public {
-        Incentive.IncentiveData memory data = helper.getCubeData(
+        Incentive.IncentiveData memory data = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -540,7 +540,7 @@ contract IncentiveTest is Test {
             0,
             137
         );
-        Incentive.IncentiveData memory data2 = helper.getCubeData(
+        Incentive.IncentiveData memory data2 = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -568,7 +568,7 @@ contract IncentiveTest is Test {
     }
 
     function testEmptySignatureArray() public {
-        Incentive.IncentiveData memory data = helper.getCubeData(
+        Incentive.IncentiveData memory data = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -585,7 +585,7 @@ contract IncentiveTest is Test {
     }
 
     function testInvalidSignature() public {
-        Incentive.IncentiveData memory _data = helper.getCubeData(
+        Incentive.IncentiveData memory _data = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -608,7 +608,7 @@ contract IncentiveTest is Test {
     }
 
     function testEmptyIncentiveDataTxs() public {
-        Incentive.IncentiveData memory data = helper.getCubeData(
+        Incentive.IncentiveData memory data = helper.getIncentiveData(
             ALICE,
             address(factoryContract),
             address(erc20Mock),
@@ -670,7 +670,7 @@ contract IncentiveTest is Test {
         bool isActive = incentiveContract.s_isClaimingActive();
 
         vm.prank(ownerPubKey);
-        incentiveContract.setIsMintingActive(false);
+        incentiveContract.setIsClaimingActive(false);
 
         bool isActiveUpdated = incentiveContract.s_isClaimingActive();
 
@@ -730,7 +730,7 @@ contract IncentiveTest is Test {
             abi.encodeWithSelector(selector, BOB, incentiveContract.DEFAULT_ADMIN_ROLE());
         vm.expectRevert(expectedError);
         vm.prank(BOB);
-        incentiveContract.setIsMintingActive(false);
+        incentiveContract.setIsClaimingActive(false);
 
         bool isActive2 = incentiveContract.s_isClaimingActive();
         assertEq(isActive2, true);
@@ -740,7 +740,7 @@ contract IncentiveTest is Test {
         vm.stopBroadcast();
 
         vm.prank(BOB);
-        incentiveContract.setIsMintingActive(false);
+        incentiveContract.setIsClaimingActive(false);
 
         bool isActive3 = incentiveContract.s_isClaimingActive();
         assertEq(isActive3, false);
@@ -748,21 +748,21 @@ contract IncentiveTest is Test {
 
     function testSetTrueMintingToTrueAgain() public {
         vm.prank(ownerPubKey);
-        incentiveContract.setIsMintingActive(true);
+        incentiveContract.setIsClaimingActive(true);
         assertEq(incentiveContract.s_isClaimingActive(), true);
     }
 
     function testSetFalseMintingToFalseAgain() public {
         vm.startPrank(ownerPubKey);
-        incentiveContract.setIsMintingActive(false);
-        incentiveContract.setIsMintingActive(false);
+        incentiveContract.setIsClaimingActive(false);
+        incentiveContract.setIsClaimingActive(false);
         vm.stopPrank();
         assertEq(incentiveContract.s_isClaimingActive(), false);
     }
 
     modifier SetMintingToFalse() {
         vm.startBroadcast(ownerPubKey);
-        incentiveContract.setIsMintingActive(false);
+        incentiveContract.setIsClaimingActive(false);
         vm.stopBroadcast();
         _;
     }
@@ -779,5 +779,102 @@ contract IncentiveTest is Test {
     {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         return abi.encodePacked(r, s, v);
+    }
+
+    // Add new test for inactive quest rewards
+    function testClaimRewardInactiveQuest() public {
+        // Setup
+        uint256 questId = 9999; // Use a different questId than the one initialized
+        
+        // Create data for reward claim
+        Incentive.IncentiveData memory data = helper.getIncentiveData(
+            ALICE,
+            address(factoryContract),
+            address(erc20Mock),
+            0,
+            100,
+            ITokenType.TokenType.ERC20,
+            0,
+            137
+        );
+        
+        // Change the questId to the inactive one
+        data.questId = questId;
+        
+        // Sign the data
+        bytes32 structHash = helper.getStructHash(data);
+        bytes32 digest = helper.getDigest(getDomainSeparator(), structHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(adminPrivateKey, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        
+        // The quest was not initialized, so it should not be active
+        bool isActive = incentiveContract.isQuestActive(questId);
+        assertEq(isActive, false);
+        
+        // Try to claim rewards and expect revert
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(Incentive.Incentive__QuestInactive.selector, questId));
+        incentiveContract.claimReward(data, signature);
+        
+        // Verify no balance was transferred
+        uint256 aliceBal = erc20Mock.balanceOf(ALICE);
+        assertEq(aliceBal, 0);
+    }
+    
+    // Test for claiming after unpublishing a quest
+    function testClaimRewardUnpublishedQuest() public {
+        // Initialize a quest
+        uint256 questId = 42;
+        vm.prank(adminAddress);
+        incentiveContract.initializeQuest(
+            questId,
+            new string[](0),
+            "Temporary Quest",
+            Incentive.Difficulty.BEGINNER,
+            Incentive.QuestType.QUEST,
+            new string[](0)
+        );
+        
+        // Confirm quest is active
+        bool isActive = incentiveContract.isQuestActive(questId);
+        assertEq(isActive, true);
+        
+        // Create signed data for claim
+        Incentive.IncentiveData memory data = helper.getIncentiveData(
+            ALICE,
+            address(factoryContract),
+            address(erc20Mock),
+            0,
+            100,
+            ITokenType.TokenType.ERC20,
+            0,
+            137
+        );
+        
+        // Set questId to the one we just initialized
+        data.questId = questId;
+        
+        // Generate signature
+        bytes32 structHash = helper.getStructHash(data);
+        bytes32 digest = helper.getDigest(getDomainSeparator(), structHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(adminPrivateKey, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        
+        // Now unpublish the quest
+        vm.prank(adminAddress);
+        incentiveContract.unpublishQuest(questId);
+        
+        // Verify quest is now inactive
+        isActive = incentiveContract.isQuestActive(questId);
+        assertEq(isActive, false);
+        
+        // Attempt to claim rewards for the unpublished quest
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(Incentive.Incentive__QuestInactive.selector, questId));
+        incentiveContract.claimReward(data, signature);
+        
+        // Verify no balance was transferred
+        uint256 aliceBal = erc20Mock.balanceOf(ALICE);
+        assertEq(aliceBal, 0);
     }
 }

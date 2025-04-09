@@ -99,3 +99,19 @@ verify_base_sepolia:
 		--chain-id 84532 \
 		--verifier etherscan \
 		--etherscan-api-key ${BASESCAN_API_KEY}
+
+verify_base:
+	@if [ -z "${ADDRESS}" ] || [ -z "${CONTRACT}" ]; then \
+		echo "Usage: make verify ADDRESS=0x... CONTRACT=path:Name"; \
+		echo "Example targets:"; \
+		echo "  Incentive:     src/Incentive.sol:Incentive"; \
+		echo "  Factory:       src/escrow/Factory.sol:Factory"; \
+		echo "  Escrow:        src/escrow/Escrow.sol:Escrow"; \
+		exit 1; \
+	fi
+	forge verify-contract \
+		${ADDRESS} \
+		"${CONTRACT}" \
+		--chain-id 8453 \
+		--verifier etherscan \
+		--etherscan-api-key ${BASESCAN_API_KEY}

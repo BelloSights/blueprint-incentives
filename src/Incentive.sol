@@ -27,6 +27,7 @@ import {IFactory} from "./escrow/interfaces/IFactory.sol";
 /// Instead, it simply verifies an EIP-712–signed "IncentiveData" struct (preventing replay via a nonce),
 /// calls the factory to distribute rewards (if provided),
 /// and now enforces that a reward for a given quest may only be claimed once every 24 hours.
+/// @custom:oz-upgrades-from Incentive
 contract Incentive is
     Initializable,
     AccessControlUpgradeable,
@@ -45,6 +46,7 @@ contract Incentive is
     error Incentive__TreasuryNotSet();
     error Incentive__InvalidAdminAddress();
     error Incentive__ClaimCooldownNotExpired(uint256 timeLeft);
+    error Incentive__QuestInactive(uint256 questId);
 
     // ===== STATE =====
     bool public s_isClaimingActive;
@@ -138,6 +140,18 @@ contract Incentive is
     /// @notice Emitted when the treasury address is updated
     /// @param newTreasury The new treasury address
     event UpdatedTreasury(address indexed newTreasury);
+
+    /// @notice Emitted when a user claims a reward, capturing wallet-related data
+    /// @param questId The ID of the quest associated with the claim
+    /// @param toAddress The address of the user claiming the reward
+    /// @param walletProvider The wallet provider used by the claimer
+    /// @param embedOrigin The origin source of the embed
+    event WalletData(
+        uint256 indexed questId,
+        address indexed toAddress,
+        string walletProvider,
+        string embedOrigin
+    );
 
     // ===== STRUCTS =====
     struct TransactionData {
@@ -238,11 +252,19 @@ contract Incentive is
         external
         nonReentrant
     {
+        // Check if claiming is active
         if (!s_isClaimingActive) {
             revert Incentive__ClaimingIsNotActive();
         }
+
+        // Check if the treasury is set
         if (s_treasury == address(0)) {
             revert Incentive__TreasuryNotSet();
+        }
+
+        // Check if the quest is active
+        if (!isQuestActive(data.questId)) {
+            revert Incentive__QuestInactive(data.questId);
         }
 
         // Check cooldown: each address can claim for a given quest only once every 24 hours.
@@ -254,8 +276,12 @@ contract Incentive is
 
         // Validate signature and nonce.
         _validateSignature(data, signature);
+
         // Update last claimed timestamp.
         s_lastClaimed[data.questId][msg.sender] = block.timestamp;
+
+        // Emit wallet data for tracking
+        emit WalletData(data.questId, data.toAddress, data.walletProvider, data.embedOrigin);
 
         // For every transaction submitted, emit a IncentiveTransaction event.
         for (uint256 i = 0; i < data.transactions.length; i++) {
@@ -397,7 +423,7 @@ contract Incentive is
     /// @notice Enables or disables the reward claim process
     /// @dev Can only be called by an account with the default admin role.
     /// @param _isActive Boolean indicating whether minting should be active
-    function setIsMintingActive(bool _isActive) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setIsClaimingActive(bool _isActive) external onlyRole(DEFAULT_ADMIN_ROLE) {
         s_isClaimingActive = _isActive;
         emit MintingSwitch(_isActive);
     }

@@ -8,7 +8,7 @@ import {
 } from "../src/viem";
 
 // Test configuration from .env
-export const QUEST_ID = 1n;
+export const QUEST_ID = 3n;
 export const TEST_TITLE = "Base Sepolia Quest";
 export const TEST_COMMUNITIES = ["base-community"];
 export const TEST_TAGS = ["DeFi", "Base"];
@@ -20,8 +20,8 @@ export const TOTAL_ERC20 = parseEther("10");
 // Per-user reward amounts
 export const ERC20_TOKEN = blueprintTokenContract.address;
 export const REWARD_NATIVE = parseEther("0.001");
-export const REWARD_ERC20 = parseEther("1");
-export const RAKE_BPS = 2500n; // 25%
+export const REWARD_ERC20 = parseEther("10");
+export const RAKE_BPS = 0n; // 0%
 
 export const TEST_CUBE_DATA: Incentive = {
   questId: QUEST_ID,

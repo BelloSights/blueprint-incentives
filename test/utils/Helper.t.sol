@@ -60,7 +60,7 @@ contract Helper is Incentive {
     /// @param rakeBps The rake basis points.
     /// @param chainId The chain id where the reward applies.
     /// @return A IncentiveData struct with one dummy TransactionData (fields such as feeRecipients are no longer included).
-    function getCubeData(
+    function getIncentiveData(
         address _claimTo,
         address factoryAddress,
         address tokenAddress,

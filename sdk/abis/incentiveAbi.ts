@@ -500,7 +500,7 @@ export const incentiveAbi = [
   },
   {
     type: "function",
-    name: "setIsMintingActive",
+    name: "setIsClaimingActive",
     inputs: [
       {
         name: "_isActive",
@@ -852,6 +852,37 @@ export const incentiveAbi = [
     anonymous: false,
   },
   {
+    type: "event",
+    name: "WalletData",
+    inputs: [
+      {
+        name: "questId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
+      },
+      {
+        name: "toAddress",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "walletProvider",
+        type: "string",
+        indexed: false,
+        internalType: "string",
+      },
+      {
+        name: "embedOrigin",
+        type: "string",
+        indexed: false,
+        internalType: "string",
+      },
+    ],
+    anonymous: false,
+  },
+  {
     type: "error",
     name: "AccessControlBadConfirmation",
     inputs: [],
@@ -961,6 +992,17 @@ export const incentiveAbi = [
     type: "error",
     name: "Incentive__NonceAlreadyUsed",
     inputs: [],
+  },
+  {
+    type: "error",
+    name: "Incentive__QuestInactive",
+    inputs: [
+      {
+        name: "questId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
   },
   {
     type: "error",
