@@ -1,6 +1,5 @@
 import { Address, parseEther } from "viem";
 import {
-  blueprintTokenContract,
   factoryContract,
   Incentive,
   TOKEN_TYPES,
@@ -18,7 +17,7 @@ export const TOTAL_NATIVE = parseEther("0.01");
 export const TOTAL_ERC20 = parseEther("10");
 
 // Per-user reward amounts
-export const ERC20_TOKEN = blueprintTokenContract.address;
+export const ERC20_TOKEN = "0x0000000000000000000000000000000000000000";
 export const REWARD_NATIVE = parseEther("0.001");
 export const REWARD_ERC20 = parseEther("10");
 export const RAKE_BPS = 0n; // 0%

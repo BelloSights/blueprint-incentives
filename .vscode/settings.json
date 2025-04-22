@@ -4,7 +4,4 @@
     "editor.defaultFormatter": "JuanBlanco.solidity"
   },
   "solidity.formatter": "forge",
-  "slither.solcPath": "",
-  "slither.hiddenDetectors": [],
-  "security.olympix.project.includePath": "/src"
 }

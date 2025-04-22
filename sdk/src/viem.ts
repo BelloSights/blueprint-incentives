@@ -1,15 +1,28 @@
 import dotenv from "dotenv";
 import path from "path";
 import {
+  createThirdwebClient,
+  defineChain as defineChainThirdweb,
+  getRpcClient,
+} from "thirdweb";
+import {
+  Account,
   Address,
+  Chain,
+  ChainContract,
   createPublicClient,
   createWalletClient,
   defineChain,
+  EIP1193RequestFn,
+  EIP1474Methods,
   http,
+  PublicClient,
+  Transport,
+  WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { blueprintERC1155FactoryAbi, } from "../abis";
 import { blueprintStorefrontAbi } from "../abis/blueprintStorefrontAbi";
-import { blueprintTokenAbi } from "../abis/blueprintTokenAbi";
 import { factoryAbi } from "../abis/factoryAbi";
 import { incentiveAbi } from "../abis/incentiveAbi";
 import { treasuryAbi } from "../abis/treasuryAbi";
@@ -56,7 +69,8 @@ export type Incentive = {
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
 const BASE_SEPOLIA_RPC = process.env.BASE_SEPOLIA_RPC;
-const INCENTIVE_PROXY_ADDRESS = process.env.INCENTIVE_PROXY_ADDRESS as `0x${string}`;
+const INCENTIVE_PROXY_ADDRESS = process.env
+  .INCENTIVE_PROXY_ADDRESS as `0x${string}`;
 const FACTORY_PROXY_ADDRESS = process.env
   .FACTORY_PROXY_ADDRESS as `0x${string}`;
 const STOREFRONT_PROXY_ADDRESS = process.env
@@ -138,16 +152,170 @@ export const storefrontContract = {
   chain: baseSepolia,
 };
 
-console.log("Blueprint token address:", BLUEPRINT_TOKEN_ADDRESS);
-export const blueprintTokenContract = {
-  address: BLUEPRINT_TOKEN_ADDRESS,
-  abi: blueprintTokenAbi,
-  chain: baseSepolia,
-};
-
 console.log("Treasury contract address:", TREASURY_ADDRESS);
 export const treasuryContract = {
   address: TREASURY_ADDRESS,
   abi: treasuryAbi,
   chain: baseSepolia,
+};
+
+const clientId = process.env.THIRDWEB_CLIENT_ID;
+const secretKey = process.env.THIRDWEB_SECRET_KEY;
+if (!clientId || !secretKey) {
+  throw new Error("THIRDWEB_CLIENT_ID and THIRDWEB_SECRET_KEY must be set");
+}
+
+export const THIRDWEB_CLIENT = createThirdwebClient({
+  clientId: clientId,
+  secretKey: secretKey,
+});
+
+// Create Viem Wallet and Public Clients
+export const createViemClients = async (
+  chainId: number
+): Promise<{
+  walletClient: WalletClient<Transport, Chain, Account>;
+  publicClient: PublicClient<Transport, Chain>;
+  rpcClient: EIP1193RequestFn<EIP1474Methods>;
+}> => {
+  const privateKey = process.env.PRIVATE_KEY_WITHOUT_0X;
+  if (!privateKey) {
+    throw new Error("PRIVATE_KEY must be set in your environment variables");
+  }
+  const viemConfig = getViemConfigFromChainId(chainId);
+
+  const chain = defineChain(viemConfig);
+
+  const publicClient = createPublicClient({
+    chain: chain,
+    transport: http(viemConfig.rpcUrls.default.http[0]),
+  });
+
+  const walletClient = createWalletClient({
+    chain: chain,
+    transport: http(viemConfig.rpcUrls.default.http[0]),
+    account: privateKeyToAccount(`0x${privateKey}`),
+  });
+
+  const rpcClient = getRpcClient({
+    client: THIRDWEB_CLIENT,
+    chain: {
+      id: chain.id,
+      rpc: viemConfig.rpcUrls.default.http[0],
+    },
+  }) as EIP1193RequestFn<EIP1474Methods>;
+
+  return { walletClient, publicClient, rpcClient };
+};
+
+// Get Viem Config from Chain ID
+export const getViemConfigFromChainId = (chainId: number): Chain => {
+  const thirdwebChain = defineChainThirdweb(chainId);
+  const rpcUrl = thirdwebChain.rpc;
+  if (!rpcUrl) {
+    throw new Error(`No RPC URL found for chain ${chainId}`);
+  }
+  const viemConfig: Chain = {
+    ...thirdwebChain,
+    name: thirdwebChain.name || `Chain ${chainId}`,
+    nativeCurrency: {
+      name: thirdwebChain.nativeCurrency?.name || "ETH",
+      symbol: thirdwebChain.nativeCurrency?.symbol || "ETH",
+      decimals: thirdwebChain.nativeCurrency?.decimals || 18,
+    },
+    rpcUrls: {
+      default: { http: [rpcUrl] },
+      public: { http: [rpcUrl] },
+    },
+    blockExplorers: {
+      default: {
+        name: thirdwebChain.blockExplorers?.[0]?.name || "Default",
+        url: thirdwebChain.blockExplorers?.[0]?.url || "",
+      },
+    },
+    contracts: {
+      multicall3:
+        "0xcA11bde05977b3631167028862bE2a173976CA11" as unknown as ChainContract,
+    },
+    testnet: chainId === 84532,
+  };
+  return viemConfig;
+};
+
+// Function to get contract addresses based on chain ID
+export const getContractAddresses = (chainId: number) => {
+  let incentiveProxyAddress: `0x${string}`;
+  let factoryProxyAddress: `0x${string}`;
+  let dropFactoryProxyAddress: `0x${string}`;
+
+  switch (chainId) {
+    case 8453: // Base Mainnet
+      incentiveProxyAddress = process.env
+        .BASE_INCENTIVE_PROXY_ADDRESS as `0x${string}`;
+      factoryProxyAddress = process.env
+        .BASE_FACTORY_PROXY_ADDRESS as `0x${string}`;
+      dropFactoryProxyAddress = process.env
+        .BASE_DROP_FACTORY_PROXY_ADDRESS as `0x${string}`;
+      break;
+    case 84532: // Base Sepolia
+      incentiveProxyAddress = process.env
+        .BASE_SEPOLIA_INCENTIVE_PROXY_ADDRESS as `0x${string}`;
+      factoryProxyAddress = process.env
+        .BASE_SEPOLIA_FACTORY_PROXY_ADDRESS as `0x${string}`;
+      dropFactoryProxyAddress = process.env
+        .BASE_SEPOLIA_ERC1155_FACTORY_PROXY_ADDRESS as `0x${string}`;
+      break;
+    default:
+      throw new Error(
+        `Unsupported chain ID: ${chainId}. Only Base Mainnet (8453) and Base Sepolia (84532) are supported.`
+      );
+  }
+
+  if (!incentiveProxyAddress) {
+    throw new Error(
+      `INCENTIVE_PROXY_ADDRESS for chain ID ${chainId} is not set`
+    );
+  }
+  if (!factoryProxyAddress) {
+    throw new Error(`FACTORY_PROXY_ADDRESS for chain ID ${chainId} is not set`);
+  }
+  if (!dropFactoryProxyAddress) {
+    throw new Error(
+      `BASE_SEPOLIA_ERC1155_FACTORY_PROXY_ADDRESS for chain ID ${chainId} is not set`
+    );
+  }
+
+  return {
+    incentiveProxyAddress,
+    factoryProxyAddress,
+    dropFactoryProxyAddress,
+  };
+};
+
+// Function to create contract instances for any chain ID
+export const getContractsForChain = (chainId: number) => {
+  const chain = getViemConfigFromChainId(chainId);
+  const {
+    incentiveProxyAddress,
+    factoryProxyAddress,
+    dropFactoryProxyAddress,
+  } = getContractAddresses(chainId);
+
+  return {
+    incentiveContract: {
+      address: incentiveProxyAddress,
+      abi: incentiveAbi,
+      chain,
+    },
+    factoryContract: {
+      address: factoryProxyAddress,
+      abi: factoryAbi,
+      chain,
+    },
+    dropFactoryContract: {
+      address: dropFactoryProxyAddress,
+      abi: blueprintERC1155FactoryAbi,
+      chain,
+    },
+  };
 };

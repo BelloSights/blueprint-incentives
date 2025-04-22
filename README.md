@@ -9,14 +9,12 @@
 [![Twitter](https://img.shields.io/twitter/follow/bpdotfun?color=blue&style=flat-square)](https://twitter.com/bpdotfun)
 [![LICENSE](https://img.shields.io/badge/license-Apache--2.0-blue?logo=apache)](./LICENSE)
 
-# bp.fun Contracts
+# BP.FUN Contracts
 
 This repository contains a suite of upgradeable smart contracts that power the Blueprint ecosystem. The contracts include:
 
-- **BlueprintToken** – An ERC20 token (BP) with burn, permit, and UUPS upgradeability.
 - **Incentive** – A reward claim contract that uses EIP‑712 signatures to verify reward claims, enforce a daily reward cap, and trigger reward distribution via a factory.
-- **BlueprintStorefront** – A storefront contract that accepts payments (in BP tokens or ETH) for digital/physical items, splitting incoming funds among creator, buyback, and treasury wallets.
-- **Treasury** – A flexible, upgradeable treasury contract that holds BP tokens, ETH, and other ERC20 tokens and allows admin withdrawals or donations.
+- **BlueprintERC1155Factory** – A factory contract for deploying and managing ERC1155 NFT collections, enabling NFT drops with configurable fees and royalties.
 
 ---
 
@@ -24,10 +22,8 @@ This repository contains a suite of upgradeable smart contracts that power the B
 
 - [Overview](#overview)
 - [Smart Contract Details](#smart-contract-details)
-  - [BlueprintToken](#blueprinttoken)
   - [Incentive](#incentive)
-  - [BlueprintStorefront](#blueprintstorefront)
-  - [Treasury](#treasury)
+  - [BlueprintERC1155Factory](#blueprinterc1155factory)
 - [Setup and Installation](#setup-and-installation)
 - [Deployment](#deployment)
 - [Testing](#testing)
@@ -38,23 +34,11 @@ This repository contains a suite of upgradeable smart contracts that power the B
 
 ## Overview
 
-Blueprint’s smart contract suite enables a storefront for creators with reward claims. The reward claim process is a fork of Layer3's [CUBE](https://github.com/layer3xyz/cubes) contract for reward distribution. The contracts are built with upgradeability (UUPS pattern) and leverage OpenZeppelin’s upgradeable libraries for security and reliability.
+Blueprint's smart contract suite enables reward claims and NFT collections management. The reward claim process is a fork of Layer3's [CUBE](https://github.com/layer3xyz/cubes) contract for reward distribution. The contracts are built with upgradeability (UUPS pattern) and leverage OpenZeppelin's upgradeable libraries for security and reliability.
 
 ---
 
 ## Smart Contract Details
-
-### BlueprintToken
-
-- **Purpose:**  
-  Upgradeable ERC20 token with burn, permit, and owner-controlled upgrades.
-- **Key Features:**
-  - Uses UUPS upgradeability.
-  - Initial mint of 10 billion tokens sent to a treasury address.
-  - Incorporates ERC20Permit for gas-less approvals.
-- **File:** [BlueprintToken.sol](./src/BlueprintToken.sol)
-
----
 
 ### Incentive
 
@@ -68,30 +52,17 @@ Blueprint’s smart contract suite enables a storefront for creators with reward
 
 ---
 
-### BlueprintStorefront
+### BlueprintERC1155Factory
 
 - **Purpose:**  
-  A storefront to sell items (physical or digital) that accepts BP tokens or ETH. Payments are split among:
-  - **Buyback Wallet:** For buyback/liquidity purposes.
-  - **Creator Wallet:** Direct to content creator.
-  - **Blueprint Wallet:** Treasury.
+  Factory contract for deploying and managing BlueprintERC1155 collection clones with NFT drop functionality.
 - **Key Features:**
-  - EIP‑712 signature–based purchase authorization.
-  - Item management with supply tracking and purchase history.
-  - Emergency withdrawal functionality.
-- **File:** [BlueprintStorefront.sol](./src/BlueprintStorefront.sol)
-
----
-
-### Treasury
-
-- **Purpose:**  
-  Manages funds (BP tokens, ETH, or any ERC20) with admin-controlled withdrawals and donations.
-- **Key Features:**
-  - Supports direct ETH or token withdrawals.
-  - Uses UUPS upgradeability.
-  - Provides donation functionality.
-- **File:** [Treasury.sol](./src/Treasury.sol)
+  - Uses OpenZeppelin's Clones library for gas-efficient deployment.
+  - Configurable fee structure for platform fees and creator royalties.
+  - Admin controls for collection and drop management.
+  - Supports creating and managing drops with start/end times.
+  - Access control for admin and creator roles.
+- **File:** [BlueprintERC1155Factory.sol](./src/nft/BlueprintERC1155Factory.sol)
 
 ---
 
@@ -185,14 +156,14 @@ To generate the SDK ABIs, run the following commands:
 jq '.abi' out/Incentive.sol/Incentive.json > sdk/abis/incentiveAbi.json
 jq '.abi' out/Escrow.sol/Escrow.json > sdk/abis/escrowAbi.json
 jq '.abi' out/Factory.sol/Factory.json > sdk/abis/factoryAbi.json
-jq '.abi' out/BlueprintToken.sol/BlueprintToken.json > sdk/abis/blueprintTokenAbi.json
-jq '.abi' out/BlueprintStorefront.sol/BlueprintStorefront.json > sdk/abis/blueprintStorefrontAbi.json
+jq '.abi' out/BlueprintERC1155Factory.sol/BlueprintERC1155Factory.json > sdk/abis/blueprintERC1155FactoryAbi.json
+jq '.abi' out/BlueprintERC1155.sol/BlueprintERC1155.json > sdk/abis/blueprintERC1155Abi.json
 ```
 
 ## Troubleshooting
 
 - **Foundry Installation Issues:**  
-  If you encounter “Permission Denied” errors during `forge install`, ensure your GitHub SSH keys are correctly added. Refer to [GitHub SSH documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh).
+  If you encounter "Permission Denied" errors during `forge install`, ensure your GitHub SSH keys are correctly added. Refer to [GitHub SSH documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh).
 
 - **Deployment Failures:**  
   Ensure that the correct flags and salt values are used (especially for CREATE2 deployments) and verify that your deployer address matches the expected CREATE2 proxy address if applicable.

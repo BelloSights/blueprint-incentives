@@ -129,13 +129,14 @@ contract IncentiveTest is Test {
 
         vm.startPrank(adminAddress);
         incentiveContract.initializeQuest(
-            deployEscrow.QUEST_ID(),
+            1,
             new string[](0),
             "Quest Title",
             Incentive.Difficulty.BEGINNER,
             Incentive.QuestType.QUEST,
             new string[](0)
         );
+        factoryContract.registerQuest(1, 1);
 
         vm.deal(adminAddress, 100 ether);
         fundEscrowContract();

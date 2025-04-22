@@ -5,7 +5,6 @@ import { erc20Abi, parseEther } from "viem";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { StorefrontSDK } from "../src/storefrontSdk";
 import {
-  blueprintTokenContract,
   publicClient,
   storefrontContract,
   walletClient,
@@ -31,7 +30,7 @@ describe.skip("Storefront SDK", () => {
     // --- Blueprint Token Setup ---
     // Approve the storefront contract to spend Blueprint tokens on behalf of the user.
     const approvalTx = await walletClient.writeContract({
-      address: blueprintTokenContract.address,
+      address: "0x0000000000000000000000000000000000000000",
       abi: erc20Abi,
       functionName: "approve",
       args: [storefrontContract.address, parseEther("100")],
@@ -86,7 +85,7 @@ describe.skip("Storefront SDK", () => {
   afterAll(async () => {
     // Emergency withdraw: recover Blueprint tokens from the storefront contract.
     const withdrawTx = await sdk.emergencyWithdraw(
-      blueprintTokenContract.address,
+      "0x0000000000000000000000000000000000000000",
       parseEther("10")
     );
     const receipt = await publicClient.waitForTransactionReceipt({
