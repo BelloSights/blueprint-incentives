@@ -84,7 +84,7 @@ export class DropSDK {
       while (!simulationSuccess && simulationAttempt < maxSimulationAttempts) {
         try {
           simulationResult = await this.publicClient.simulateContract({
-            address: ethers.getAddress(params.address),
+            address: this.formatAddress(params.address),
             abi: params.abi,
             functionName: params.functionName,
             args: params.args,
@@ -105,7 +105,9 @@ export class DropSDK {
 
           // Log the rate limit and retry
           console.warn(
-            `Rate limited (429) during simulation. Retrying in ${simulationBackoffMs}ms... (Attempt ${simulationAttempt + 1}/${maxSimulationAttempts})`
+            `Rate limited (429) during simulation. Retrying in ${simulationBackoffMs}ms... (Attempt ${
+              simulationAttempt + 1
+            }/${maxSimulationAttempts})`
           );
 
           // Wait with exponential backoff
@@ -184,7 +186,9 @@ export class DropSDK {
       // Default to 90 seconds for testnet, which can be slow
       const waitTimeoutMs = params.waitTimeoutMs || 90_000;
       console.log(
-        `Waiting up to ${waitTimeoutMs / 1000} seconds for transaction confirmation...`
+        `Waiting up to ${
+          waitTimeoutMs / 1000
+        } seconds for transaction confirmation...`
       );
 
       // Add more detailed receipt waiting with retries
@@ -294,13 +298,15 @@ export class DropSDK {
           error.message?.includes("Status: 429");
 
         // If we've reached max retries or it's not a rate limit error, throw
-        if (retryCount >= maxRetries || !is429Error) {
+        if (retryCount >= maxRetries) {
           throw error;
         }
 
         // Log the rate limit and backoff
         console.warn(
-          `Rate limited (429). Retrying in ${backoffMs}ms... (Attempt ${retryCount + 1}/${maxRetries})`
+          `Rate limited (429). Retrying in ${backoffMs}ms... (Attempt ${
+            retryCount + 1
+          }/${maxRetries})`
         );
 
         // Wait with exponential backoff
@@ -405,7 +411,7 @@ export class DropSDK {
     ).dropFactoryContract;
 
     // Format addresses using ethers to prevent issues
-    const formattedCollectionAddress = ethers.getAddress(collectionAddress);
+    const formattedCollectionAddress = this.formatAddress(collectionAddress);
 
     // Use increased timeouts and retries for createDrop specifically
     const tx = await this.signAndSendTransaction({
@@ -505,6 +511,48 @@ export class DropSDK {
       abi,
       functionName: "updateCollectionURI",
       args: [this.formatAddress(collectionAddress), uri],
+    });
+
+    return { tx };
+  }
+
+  async updateCollectionName({
+    collectionAddress,
+    name,
+  }: {
+    collectionAddress: Address;
+    name: string;
+  }) {
+    const { address, abi, chain } = getContractsForChain(
+      this.chainId
+    ).dropFactoryContract;
+
+    const tx = await this.signAndSendTransaction({
+      address: this.formatAddress(address),
+      abi,
+      functionName: "updateCollectionName",
+      args: [this.formatAddress(collectionAddress), name],
+    });
+
+    return { tx };
+  }
+
+  async updateCollectionSymbol({
+    collectionAddress,
+    symbol,
+  }: {
+    collectionAddress: Address;
+    symbol: string;
+  }) {
+    const { address, abi, chain } = getContractsForChain(
+      this.chainId
+    ).dropFactoryContract;
+
+    const tx = await this.signAndSendTransaction({
+      address: this.formatAddress(address),
+      abi,
+      functionName: "updateCollectionSymbol",
+      args: [this.formatAddress(collectionAddress), symbol],
     });
 
     return { tx };
@@ -1253,6 +1301,52 @@ export class DropSDK {
       args: [this.formatAddress(account), tokenId],
     });
     return balance;
+  }
+
+  /**
+   * Get the total supply for a specific token ID in a collection
+   */
+  async getTokenTotalSupply({
+    collectionAddress,
+    tokenId,
+  }: {
+    collectionAddress: Address;
+    tokenId: bigint;
+  }): Promise<bigint> {
+    const { address, abi } = getContractsForChain(
+      this.chainId
+    ).dropFactoryContract;
+
+    const totalSupply = await this.readContractWithRetry<bigint>({
+      address,
+      abi,
+      functionName: "getTokenTotalSupply",
+      args: [this.formatAddress(collectionAddress), tokenId],
+    });
+
+    return totalSupply;
+  }
+
+  /**
+   * Get the total supply across all tokens in a collection
+   */
+  async getCollectionTotalSupply({
+    collectionAddress,
+  }: {
+    collectionAddress: Address;
+  }): Promise<bigint> {
+    const { address, abi } = getContractsForChain(
+      this.chainId
+    ).dropFactoryContract;
+
+    const totalSupply = await this.readContractWithRetry<bigint>({
+      address,
+      abi,
+      functionName: "getCollectionTotalSupply",
+      args: [this.formatAddress(collectionAddress)],
+    });
+
+    return totalSupply;
   }
 
   async updateRewardPoolRecipient({

@@ -21,5 +21,6 @@ coverage-report.txt
 bin/*
 
 node_modules
+zkout/
 
 .DS_Store

@@ -21,7 +21,7 @@ import {
   WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { blueprintERC1155FactoryAbi, } from "../abis";
+import { blueprintERC1155FactoryAbi } from "../abis";
 import { blueprintStorefrontAbi } from "../abis/blueprintStorefrontAbi";
 import { factoryAbi } from "../abis/factoryAbi";
 import { incentiveAbi } from "../abis/incentiveAbi";
@@ -75,8 +75,6 @@ const FACTORY_PROXY_ADDRESS = process.env
   .FACTORY_PROXY_ADDRESS as `0x${string}`;
 const STOREFRONT_PROXY_ADDRESS = process.env
   .STOREFRONT_PROXY_ADDRESS as `0x${string}`;
-const BLUEPRINT_TOKEN_ADDRESS = process.env
-  .BLUEPRINT_TOKEN_ADDRESS as `0x${string}`;
 const TREASURY_ADDRESS = process.env.TREASURY_ADDRESS as `0x${string}`;
 
 if (!PRIVATE_KEY) {
@@ -93,9 +91,6 @@ if (!FACTORY_PROXY_ADDRESS) {
 }
 if (!STOREFRONT_PROXY_ADDRESS) {
   throw new Error("STOREFRONT_PROXY_ADDRESS is not set");
-}
-if (!BLUEPRINT_TOKEN_ADDRESS) {
-  throw new Error("BLUEPRINT_TOKEN_ADDRESS is not set");
 }
 
 // Define Base Sepolia chain configuration
@@ -237,7 +232,7 @@ export const getViemConfigFromChainId = (chainId: number): Chain => {
       multicall3:
         "0xcA11bde05977b3631167028862bE2a173976CA11" as unknown as ChainContract,
     },
-    testnet: chainId === 84532,
+    testnet: chainId === 84532 || chainId === 4457845,
   };
   return viemConfig;
 };
@@ -255,7 +250,7 @@ export const getContractAddresses = (chainId: number) => {
       factoryProxyAddress = process.env
         .BASE_FACTORY_PROXY_ADDRESS as `0x${string}`;
       dropFactoryProxyAddress = process.env
-        .BASE_DROP_FACTORY_PROXY_ADDRESS as `0x${string}`;
+        .BASE_ERC1155_FACTORY_PROXY_ADDRESS as `0x${string}`;
       break;
     case 84532: // Base Sepolia
       incentiveProxyAddress = process.env
@@ -265,9 +260,17 @@ export const getContractAddresses = (chainId: number) => {
       dropFactoryProxyAddress = process.env
         .BASE_SEPOLIA_ERC1155_FACTORY_PROXY_ADDRESS as `0x${string}`;
       break;
+    case 543210: // Zero Network
+      incentiveProxyAddress = process.env
+        .ZERO_INCENTIVE_PROXY_ADDRESS as `0x${string}`;
+      factoryProxyAddress = process.env
+        .ZERO_FACTORY_PROXY_ADDRESS as `0x${string}`;
+      dropFactoryProxyAddress = process.env
+        .ZERO_ERC1155_FACTORY_PROXY_ADDRESS as `0x${string}`;
+      break;
     default:
       throw new Error(
-        `Unsupported chain ID: ${chainId}. Only Base Mainnet (8453) and Base Sepolia (84532) are supported.`
+        `Unsupported chain ID: ${chainId}. Only Base Mainnet (8453), Base Sepolia (84532), Zero Network (543210), and Zero Sepolia Testnet (4457845) are supported.`
       );
   }
 
@@ -281,7 +284,7 @@ export const getContractAddresses = (chainId: number) => {
   }
   if (!dropFactoryProxyAddress) {
     throw new Error(
-      `BASE_SEPOLIA_ERC1155_FACTORY_PROXY_ADDRESS for chain ID ${chainId} is not set`
+      `ERC1155_FACTORY_PROXY_ADDRESS for chain ID ${chainId} is not set`
     );
   }
 

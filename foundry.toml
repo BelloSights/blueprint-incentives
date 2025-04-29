@@ -13,14 +13,20 @@ extra_output = ["storageLayout"]
 [etherscan]
 8453 = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
 84532 = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+543210 = { key = "", url = "https://explorer.zero.network/api" }
+4457845 = { key = "", url = "https://explorer.zero.network/api" }
 
 [profile.verifier]
 8453 = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
 84532 = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+543210 = { key = "", url = "https://explorer.zero.network/api" }
+4457845 = { key = "", url = "https://explorer.zero.network/api" }
 
 [profile.verifier.delay]
 8453 = 15
 84532 = 15
+543210 = 15
+4457845 = 30
 
 [profile.verifier.retries]
 runs = 3

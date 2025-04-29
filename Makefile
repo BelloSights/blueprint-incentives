@@ -7,12 +7,22 @@ endif
 # Load environment variables
 -include $(ENV_FILE)
 
-.PHONY: deploy test coverage build deploy_proxy fork_test deploy_all deploy_escrow verify_base_sepolia deploy_storefront deploy_treasury deploy_token deploy_nft_factory upgrade_proxy upgrade_nft_factory verify_erc1155_implementation verify_blueprint_factory_implementation
+.PHONY: deploy test coverage build deploy_proxy fork_test deploy_all deploy_escrow verify_base_sepolia deploy_storefront deploy_treasury deploy_token deploy_nft_factory upgrade_proxy upgrade_nft_factory verify_erc1155_implementation verify_blueprint_factory_implementation install-foundry-zksync deploy_nft_factory_zero verify_zero
 
 DEFAULT_ANVIL_PRIVATE_KEY := 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 install:; forge install
 build:; forge build
+
+# Target to install foundry-zksync fork required for Zero Network
+install-foundry-zksync:
+	@echo "Installing foundryup-zksync - required for Zero Network deployments"
+	@curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+	@echo "Installed foundryup-zksync. You now have forge and cast with ZKsync support."
+	@echo "Note: This installation overrides any existing forge and cast binaries in ~/.foundry"
+	@echo "You can use forge without the --zksync flag for standard EVM chains"
+	@echo "To revert to a previous installation, follow instructions on Using foundryup on the official Foundry website"
+
 test:
 	@source .env.test && forge clean && forge test -vvvv --ffi
 
@@ -49,6 +59,11 @@ ifeq ($(findstring --network cyber,$(ARGS)),--network cyber)
 	NETWORK_ARGS := --rpc-url $(CYBER_MAINNET_RPC) --private-key $(PRIVATE_KEY) --broadcast -vvvv
 endif
 
+# Zero Network
+ifeq ($(findstring --network zero,$(ARGS)),--network zero)
+	NETWORK_ARGS := --rpc-url https://rpc.zerion.io/v1/zero --private-key $(PRIVATE_KEY) --broadcast --chain 543210 --zksync -vvvv
+endif
+
 # Local network
 ifeq ($(findstring --network local,$(ARGS)),--network local)
 	NETWORK_ARGS := --rpc-url http://localhost:8545 --private-key $(PRIVATE_KEY) --broadcast -vvvv
@@ -76,6 +91,21 @@ deploy_escrow:
 
 deploy_nft_factory:
 	@source $(ENV_FILE) && forge script script/DeployBlueprintNFT.s.sol:DeployBlueprintNFT $(NETWORK_ARGS) --ffi
+
+deploy_nft_factory_zero:
+	@echo "NOTE: This requires foundryup-zksync. Install with 'make install-foundry-zksync'"
+	@if ! command -v forge > /dev/null; then \
+		echo "ERROR: forge command not found. Please install foundryup-zksync first with 'make install-foundry-zksync'"; \
+		exit 1; \
+	fi
+	@source $(ENV_FILE) && forge script script/DeployBlueprintNFTZero.s.sol:DeployBlueprintNFTZero \
+		--rpc-url https://rpc.zerion.io/v1/zero \
+		--private-key $(PRIVATE_KEY) \
+		--broadcast \
+		--chain 543210 \
+		--zksync \
+		-vvvv \
+		--ffi
 
 upgrade_proxy:
 	@source $(ENV_FILE) && forge script script/UpgradeIncentive.s.sol:UpgradeIncentive $(NETWORK_ARGS) \
