@@ -21,7 +21,6 @@ import {
   WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { blueprintERC1155FactoryAbi } from "../abis";
 import { blueprintStorefrontAbi } from "../abis/blueprintStorefrontAbi";
 import { factoryAbi } from "../abis/factoryAbi";
 import { incentiveAbi } from "../abis/incentiveAbi";
@@ -241,7 +240,6 @@ export const getViemConfigFromChainId = (chainId: number): Chain => {
 export const getContractAddresses = (chainId: number) => {
   let incentiveProxyAddress: `0x${string}`;
   let factoryProxyAddress: `0x${string}`;
-  let dropFactoryProxyAddress: `0x${string}`;
 
   switch (chainId) {
     case 8453: // Base Mainnet
@@ -249,24 +247,18 @@ export const getContractAddresses = (chainId: number) => {
         .BASE_INCENTIVE_PROXY_ADDRESS as `0x${string}`;
       factoryProxyAddress = process.env
         .BASE_FACTORY_PROXY_ADDRESS as `0x${string}`;
-      dropFactoryProxyAddress = process.env
-        .BASE_ERC1155_FACTORY_PROXY_ADDRESS as `0x${string}`;
       break;
     case 84532: // Base Sepolia
       incentiveProxyAddress = process.env
         .BASE_SEPOLIA_INCENTIVE_PROXY_ADDRESS as `0x${string}`;
       factoryProxyAddress = process.env
         .BASE_SEPOLIA_FACTORY_PROXY_ADDRESS as `0x${string}`;
-      dropFactoryProxyAddress = process.env
-        .BASE_SEPOLIA_ERC1155_FACTORY_PROXY_ADDRESS as `0x${string}`;
       break;
     case 543210: // Zero Network
       incentiveProxyAddress = process.env
         .ZERO_INCENTIVE_PROXY_ADDRESS as `0x${string}`;
       factoryProxyAddress = process.env
         .ZERO_FACTORY_PROXY_ADDRESS as `0x${string}`;
-      dropFactoryProxyAddress = process.env
-        .ZERO_ERC1155_FACTORY_PROXY_ADDRESS as `0x${string}`;
       break;
     default:
       throw new Error(
@@ -282,27 +274,18 @@ export const getContractAddresses = (chainId: number) => {
   if (!factoryProxyAddress) {
     throw new Error(`FACTORY_PROXY_ADDRESS for chain ID ${chainId} is not set`);
   }
-  if (!dropFactoryProxyAddress) {
-    throw new Error(
-      `ERC1155_FACTORY_PROXY_ADDRESS for chain ID ${chainId} is not set`
-    );
-  }
 
   return {
     incentiveProxyAddress,
     factoryProxyAddress,
-    dropFactoryProxyAddress,
   };
 };
 
 // Function to create contract instances for any chain ID
 export const getContractsForChain = (chainId: number) => {
   const chain = getViemConfigFromChainId(chainId);
-  const {
-    incentiveProxyAddress,
-    factoryProxyAddress,
-    dropFactoryProxyAddress,
-  } = getContractAddresses(chainId);
+  const { incentiveProxyAddress, factoryProxyAddress } =
+    getContractAddresses(chainId);
 
   return {
     incentiveContract: {
@@ -313,11 +296,6 @@ export const getContractsForChain = (chainId: number) => {
     factoryContract: {
       address: factoryProxyAddress,
       abi: factoryAbi,
-      chain,
-    },
-    dropFactoryContract: {
-      address: dropFactoryProxyAddress,
-      abi: blueprintERC1155FactoryAbi,
       chain,
     },
   };
