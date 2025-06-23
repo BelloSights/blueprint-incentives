@@ -14,7 +14,6 @@
 This repository contains a suite of upgradeable smart contracts that power the Blueprint ecosystem. The contracts include:
 
 - **Incentive** – A reward claim contract that uses EIP‑712 signatures to verify reward claims, enforce a daily reward cap, and trigger reward distribution via a factory.
-- **BlueprintERC1155Factory** – A factory contract for deploying and managing ERC1155 NFT collections, enabling NFT drops with configurable fees and royalties.
 
 ---
 
@@ -23,7 +22,6 @@ This repository contains a suite of upgradeable smart contracts that power the B
 - [Overview](#overview)
 - [Smart Contract Details](#smart-contract-details)
   - [Incentive](#incentive)
-  - [BlueprintERC1155Factory](#blueprinterc1155factory)
 - [Setup and Installation](#setup-and-installation)
 - [Deployment](#deployment)
 - [Testing](#testing)
@@ -34,7 +32,7 @@ This repository contains a suite of upgradeable smart contracts that power the B
 
 ## Overview
 
-Blueprint's smart contract suite enables reward claims and NFT collections management. The reward claim process is a fork of Layer3's [CUBE](https://github.com/layer3xyz/cubes) contract for reward distribution. The contracts are built with upgradeability (UUPS pattern) and leverage OpenZeppelin's upgradeable libraries for security and reliability.
+Blueprint's smart contract suite enables reward claims. The reward claim process is a fork of Layer3's [CUBE](https://github.com/layer3xyz/cubes) contract for reward distribution. The contracts are built with upgradeability (UUPS pattern) and leverage OpenZeppelin's upgradeable libraries for security and reliability.
 
 ---
 
@@ -52,19 +50,7 @@ Blueprint's smart contract suite enables reward claims and NFT collections manag
 
 ---
 
-### BlueprintERC1155Factory
 
-- **Purpose:**  
-  Factory contract for deploying and managing BlueprintERC1155 collection clones with NFT drop functionality.
-- **Key Features:**
-  - Uses OpenZeppelin's Clones library for gas-efficient deployment.
-  - Configurable fee structure for platform fees and creator royalties.
-  - Admin controls for collection and drop management.
-  - Supports creating and managing drops with start/end times.
-  - Access control for admin and creator roles.
-- **File:** [BlueprintERC1155Factory.sol](./src/nft/BlueprintERC1155Factory.sol)
-
----
 
 ## Setup and Installation
 
@@ -156,8 +142,6 @@ To generate the SDK ABIs, run the following commands:
 jq '.abi' out/Incentive.sol/Incentive.json > sdk/abis/incentiveAbi.json
 jq '.abi' out/Escrow.sol/Escrow.json > sdk/abis/escrowAbi.json
 jq '.abi' out/Factory.sol/Factory.json > sdk/abis/factoryAbi.json
-jq '.abi' out/BlueprintERC1155Factory.sol/BlueprintERC1155Factory.json > sdk/abis/blueprintERC1155FactoryAbi.json
-jq '.abi' out/BlueprintERC1155.sol/BlueprintERC1155.json > sdk/abis/blueprintERC1155Abi.json
 ```
 
 ## Troubleshooting
