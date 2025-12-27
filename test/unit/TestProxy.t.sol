@@ -6,7 +6,7 @@ import {StdCheats} from "forge-std/StdCheats.sol";
 
 import {DeployProxy} from "../../script/DeployProxy.s.sol";
 import {UpgradeIncentive} from "../../script/UpgradeIncentive.s.sol";
-import {Incentive} from "../../src/Incentive.sol";
+import {Incentive} from "../../src/incentive/Incentive.sol";
 import {ERC1967Proxy} from "@openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployAndUpgradeTest is StdCheats, Test {

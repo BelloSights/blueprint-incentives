@@ -15,10 +15,10 @@ import {AccessControlUpgradeable} from
     "@openzeppelin-contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Escrow} from "./Escrow.sol";
-import {Incentive} from "../Incentive.sol";
+import {Incentive} from "./Incentive.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
-import {ITokenType} from "../escrow/interfaces/ITokenType.sol";
+import {ITokenType} from "./interfaces/ITokenType.sol";
 
 contract Factory is IFactory, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     // ===== ERRORS =====
@@ -48,6 +48,7 @@ contract Factory is IFactory, Initializable, AccessControlUpgradeable, UUPSUpgra
     mapping(uint256 => EscrowInfo) public s_escrows;
     // Mapping from questId to the escrow id that should be used.
     mapping(uint256 => uint256) public s_questToEscrow;
+
 
     // ===== EVENTS =====
     event EscrowRegistered(
@@ -245,6 +246,9 @@ contract Factory is IFactory, Initializable, AccessControlUpgradeable, UUPSUpgra
         if (escrowId == 0) revert Factory__QuestNotRegistered();
         EscrowInfo storage info = s_escrows[escrowId];
         if (!info.active) revert Factory__EscrowDisabled();
+
+        
+
         if (tokenType == TokenType.NATIVE) {
             IEscrow(info.escrow).withdrawNative(to, amount, rakeBps);
             emit TokenPayout(to, address(0), 0, amount, uint8(tokenType), questId);

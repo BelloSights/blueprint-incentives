@@ -3,10 +3,10 @@ pragma solidity 0.8.26;
 
 import {Test, console, Vm} from "forge-std/Test.sol";
 
-import {Incentive} from "../../src/Incentive.sol";
-import {Factory} from "../../src/escrow/Factory.sol";
-import {Escrow} from "../../src/escrow/Escrow.sol";
-import {ITokenType} from "../../src/escrow/interfaces/ITokenType.sol";
+import {Incentive} from "../../src/incentive/Incentive.sol";
+import {Factory} from "../../src/incentive/Factory.sol";
+import {Escrow} from "../../src/incentive/Escrow.sol";
+import {ITokenType} from "../../src/incentive/interfaces/ITokenType.sol";
 
 import {DeployProxy} from "../../script/DeployProxy.s.sol";
 import {DeployEscrow} from "../../script/DeployEscrow.s.sol";
@@ -44,6 +44,7 @@ contract IncentiveTest is Test {
         uint256 tokenId,
         ITokenType.TokenType tokenType
     );
+    event ERC20Withdrawal(address indexed token, address indexed to, uint256 amount);
 
     DeployProxy public deployer;
     Incentive public incentiveContract;
@@ -91,6 +92,77 @@ contract IncentiveTest is Test {
                 proxyAddress
             )
         );
+    }
+
+    function testRescueERC20_Success() public {
+        // Send ERC20 to Incentive proxy directly
+        uint256 amount = 1_000 ether;
+        erc20Mock.mint(address(incentiveContract), amount);
+
+        uint256 preRecipient = erc20Mock.balanceOf(ALICE);
+        uint256 preContract = erc20Mock.balanceOf(address(incentiveContract));
+        assertEq(preContract, amount);
+
+        vm.prank(ownerPubKey);
+        vm.expectEmit(true, true, true, true);
+        emit ERC20Withdrawal(address(erc20Mock), ALICE, amount);
+        incentiveContract.rescueERC20(address(erc20Mock), ALICE, amount);
+
+        assertEq(erc20Mock.balanceOf(ALICE), preRecipient + amount);
+        assertEq(erc20Mock.balanceOf(address(incentiveContract)), 0);
+    }
+
+    function testRescueERC20_OnlyAdmin() public {
+        uint256 amount = 100;
+        erc20Mock.mint(address(incentiveContract), amount);
+
+        bytes4 selector = bytes4(keccak256("AccessControlUnauthorizedAccount(address,bytes32)"));
+        bytes memory expectedError = abi.encodeWithSelector(
+            selector, BOB, incentiveContract.DEFAULT_ADMIN_ROLE()
+        );
+        vm.expectRevert(expectedError);
+        vm.prank(BOB);
+        incentiveContract.rescueERC20(address(erc20Mock), ALICE, amount);
+    }
+
+    function testRescueERC20_ZeroToken() public {
+        vm.prank(ownerPubKey);
+        vm.expectRevert(Incentive.Incentive__ZeroTokenAddress.selector);
+        incentiveContract.rescueERC20(address(0), ALICE, 1);
+    }
+
+    function testRescueERC20_ZeroRecipient() public {
+        vm.prank(ownerPubKey);
+        vm.expectRevert(Incentive.Incentive__ZeroRecipient.selector);
+        incentiveContract.rescueERC20(address(erc20Mock), address(0), 1);
+    }
+
+    function testRescueERC20_ZeroAmount() public {
+        vm.prank(ownerPubKey);
+        vm.expectRevert(Incentive.Incentive__ZeroAmount.selector);
+        incentiveContract.rescueERC20(address(erc20Mock), ALICE, 0);
+    }
+
+    function testRescueERC20_PartialAndOverAmount() public {
+        uint256 amount = 500;
+        erc20Mock.mint(address(incentiveContract), amount);
+
+        // Partial
+        vm.prank(ownerPubKey);
+        incentiveContract.rescueERC20(address(erc20Mock), ALICE, 200);
+        assertEq(erc20Mock.balanceOf(ALICE), 200);
+        assertEq(erc20Mock.balanceOf(address(incentiveContract)), 300);
+
+        // Over-cap should revert inside ERC20 transfer if insufficient balance
+        vm.prank(ownerPubKey);
+        vm.expectRevert();
+        incentiveContract.rescueERC20(address(erc20Mock), ALICE, 400);
+
+        // Remaining exact
+        vm.prank(ownerPubKey);
+        incentiveContract.rescueERC20(address(erc20Mock), ALICE, 300);
+        assertEq(erc20Mock.balanceOf(address(incentiveContract)), 0);
+        assertEq(erc20Mock.balanceOf(ALICE), 500);
     }
 
     function setUp() public {
@@ -478,6 +550,8 @@ contract IncentiveTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(adminPrivateKey, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
+        // Change recipient to avoid cooldown and hit nonce reuse check instead
+        data2.toAddress = makeAddr("nonce-reuse-other");
         bytes32 structHash2 = helper.getStructHash(data2);
         bytes32 digest2 = helper.getDigest(getDomainSeparator(), structHash2);
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(adminPrivateKey, digest2);
@@ -519,6 +593,8 @@ contract IncentiveTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(adminPrivateKey, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
+        // Change recipient to avoid cooldown and reach signer check
+        data2.toAddress = makeAddr("bad-signer-other");
         bytes32 structHash2 = helper.getStructHash(data2);
         bytes32 digest2 = helper.getDigest(getDomainSeparator(), structHash2);
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(notAdminPrivKey, digest2);
@@ -565,6 +641,8 @@ contract IncentiveTest is Test {
 
         hoax(adminAddress);
         incentiveContract.claimReward(data, signature);
+        // Advance beyond claim cooldown for same (questId, toAddress)
+        vm.warp(block.timestamp + incentiveContract.CLAIM_INTERVAL() + 1);
         incentiveContract.claimReward(data2, signature2);
     }
 

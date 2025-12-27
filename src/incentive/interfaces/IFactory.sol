@@ -2,7 +2,6 @@
 pragma solidity 0.8.26;
 
 import {ITokenType} from "./ITokenType.sol";
-import {Incentive} from "../../Incentive.sol";
 
 interface IFactory is ITokenType {
     function distributeRewards(

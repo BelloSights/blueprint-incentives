@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { IncentiveSDK } from "./incentiveSdk";
-import { StorefrontSDK } from "./storefrontSdk";
 import {
   EscrowContract,
   FactoryContract,
@@ -11,8 +10,7 @@ import {
   factoryContract,
   incentiveContract,
   publicClient,
-  storefrontContract,
-  walletClient,
+  walletClient
 } from "./viem";
 
 export {
@@ -20,8 +18,6 @@ export {
   incentiveContract,
   IncentiveSDK,
   publicClient,
-  storefrontContract,
-  StorefrontSDK,
   walletClient,
   type EscrowContract,
   type FactoryContract,

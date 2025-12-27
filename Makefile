@@ -7,7 +7,7 @@ endif
 # Load environment variables
 -include $(ENV_FILE)
 
-.PHONY: deploy test coverage build deploy_proxy fork_test deploy_all deploy_escrow verify_base_sepolia deploy_storefront deploy_treasury deploy_token upgrade_proxy install-foundry-zksync verify_zero
+.PHONY: deploy test coverage build deploy_proxy fork_test deploy_all deploy_escrow verify_base verify_base_sepolia deploy_storefront deploy_treasury deploy_token upgrade_proxy install-foundry-zksync verify_zero test-reward-pool test-coverage-reward-pool deploy_reward_pool deploy_all_with_reward_pool
 
 DEFAULT_ANVIL_PRIVATE_KEY := 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
@@ -26,8 +26,14 @@ install-foundry-zksync:
 test:
 	@source .env.test && forge clean && forge test -vvvv --ffi
 
+test-reward-pool:
+	@source .env.test && forge clean && forge test --match-contract RewardPoolTest -vvvv --ffi
+
 test-coverage:
 	@source .env.test && forge coverage --ffi
+
+test-coverage-reward-pool:
+	@source .env.test && forge coverage --match-contract RewardPoolTest --ffi
 
 coverage :; forge coverage --ffi --report debug > coverage-report.txt
 snapshot :; forge snapshot --ffi
@@ -89,29 +95,27 @@ deploy_proxy:
 deploy_escrow:
 	@source $(ENV_FILE) && forge script script/DeployEscrow.s.sol:DeployEscrow $(NETWORK_ARGS) --ffi --sig "deploy()"
 
-
+deploy_reward_pool:
+	@source $(ENV_FILE) && forge script script/DeployRewardPool.s.sol:DeployRewardPool $(NETWORK_ARGS) --ffi
 
 upgrade_proxy:
 	@source $(ENV_FILE) && forge script script/UpgradeIncentive.s.sol:UpgradeIncentive $(NETWORK_ARGS) \
 		--ffi \
 		--sig "run()"
 
-
-
 fork_test:
 	@forge test --rpc-url $(RPC_ENDPOINT) -vvv
 
 deploy_all: deploy_proxy deploy_token deploy_storefront deploy_treasury
 
-
+deploy_all_with_reward_pool: deploy_proxy deploy_token deploy_storefront deploy_treasury deploy_reward_pool
 
 verify_base_sepolia:
 	@if [ -z "${ADDRESS}" ] || [ -z "${CONTRACT}" ]; then \
 		echo "Usage: make verify ADDRESS=0x... CONTRACT=path:Name"; \
 		echo "Example targets:"; \
-		echo "  Incentive:     src/Incentive.sol:Incentive"; \
-		echo "  Factory:  src/escrow/Factory.sol:Factory"; \
-		echo "  Escrow:   src/escrow/Escrow.sol:Escrow"; \
+		echo "  RewardPoolFactory:  src/RewardPoolFactory.sol:RewardPoolFactory"; \
+		echo "  RewardPool:         src/RewardPool.sol:RewardPool"; \
 		exit 1; \
 	fi
 	forge verify-contract \
@@ -125,9 +129,8 @@ verify_base:
 	@if [ -z "${ADDRESS}" ] || [ -z "${CONTRACT}" ]; then \
 		echo "Usage: make verify ADDRESS=0x... CONTRACT=path:Name"; \
 		echo "Example targets:"; \
-		echo "  Incentive:     src/Incentive.sol:Incentive"; \
-		echo "  Factory:       src/escrow/Factory.sol:Factory"; \
-		echo "  Escrow:        src/escrow/Escrow.sol:Escrow"; \
+		echo "  RewardPoolFactory:  src/RewardPoolFactory.sol:RewardPoolFactory"; \
+		echo "  RewardPool:         src/RewardPool.sol:RewardPool"; \
 
 		exit 1; \
 	fi

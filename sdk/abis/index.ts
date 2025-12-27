@@ -5,4 +5,6 @@ export * from "./erc721Abi";
 export * from "./escrowAbi";
 export * from "./factoryAbi";
 export * from "./incentiveAbi";
+export * from "./rewardPoolAbi";
+export * from "./rewardPoolFactoryAbi";
 

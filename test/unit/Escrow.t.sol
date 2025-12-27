@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {Test, console, Vm, stdError} from "forge-std/Test.sol";
 
 import {DeployEscrow} from "../../script/DeployEscrow.s.sol";
-import {Escrow} from "../../src/escrow/Escrow.sol";
+import {Escrow} from "../../src/incentive/Escrow.sol";
 
 import {MockERC20} from "../mock/MockERC20.sol";
 import {MockERC721} from "../mock/MockERC721.sol";

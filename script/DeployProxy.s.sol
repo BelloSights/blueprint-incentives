@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
-import {Incentive} from "../src/Incentive.sol";
+import {Incentive} from "../src/incentive/Incentive.sol";
 import {Upgrades, Options} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 contract DeployProxy is Script {

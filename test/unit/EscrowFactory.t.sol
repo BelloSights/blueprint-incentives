@@ -5,7 +5,7 @@ error AccessControlUnauthorizedAccount(address account, bytes32 requiredRole);
 
 import {DeployProxy} from "../../script/DeployProxy.s.sol";
 import {DeployEscrow} from "../../script/DeployEscrow.s.sol";
-import {Incentive} from "../../src/Incentive.sol";
+import {Incentive} from "../../src/incentive/Incentive.sol";
 import {MockERC20} from "../mock/MockERC20.sol";
 import {MockERC721} from "../mock/MockERC721.sol";
 import {MockERC1155} from "../mock/MockERC1155.sol";
@@ -17,9 +17,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
-import {Escrow} from "../../src/escrow/Escrow.sol";
-import {Factory} from "../../src/escrow/Factory.sol";
-import {ITokenType} from "../../src/escrow/interfaces/ITokenType.sol";
+import {Escrow} from "../../src/incentive/Escrow.sol";
+import {Factory} from "../../src/incentive/Factory.sol";
+import {ITokenType} from "../../src/incentive/interfaces/ITokenType.sol";
 
 contract EscrowFactoryTest is Test {
     DeployEscrow public deployer;

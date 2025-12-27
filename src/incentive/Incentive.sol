@@ -19,8 +19,10 @@ import {AccessControlUpgradeable} from
 import {UUPSUpgradeable} from "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from
     "@openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {ITokenType} from "./escrow/interfaces/ITokenType.sol";
-import {IFactory} from "./escrow/interfaces/IFactory.sol";
+import {ITokenType} from "./interfaces/ITokenType.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IERC20} from "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title Incentive
 /// @notice Modified so that it no longer mints an NFT nor processes any payments.
@@ -37,6 +39,7 @@ contract Incentive is
     ITokenType
 {
     using ECDSA for bytes32;
+    using SafeERC20 for IERC20;
 
     // ===== ERRORS =====
     error Incentive__IsNotSigner();
@@ -47,6 +50,9 @@ contract Incentive is
     error Incentive__InvalidAdminAddress();
     error Incentive__ClaimCooldownNotExpired(uint256 timeLeft);
     error Incentive__QuestInactive(uint256 questId);
+    error Incentive__ZeroRecipient();
+    error Incentive__ZeroTokenAddress();
+    error Incentive__ZeroAmount();
 
     // ===== STATE =====
     bool public s_isClaimingActive;
@@ -132,6 +138,12 @@ contract Incentive is
     /// @notice Emitted when the contract balance is withdrawn by an admin
     /// @param amount The contract's balance that was withdrawn
     event ContractWithdrawal(uint256 amount);
+
+    /// @notice Emitted when ERC20 tokens are rescued from the contract
+    /// @param token The ERC20 token address
+    /// @param to The recipient address
+    /// @param amount The amount transferred
+    event ERC20Withdrawal(address indexed token, address indexed to, uint256 amount);
 
     /// @notice Emitted when a quest is disabled
     /// @param questId The ID of the quest that was disabled
@@ -267,8 +279,13 @@ contract Incentive is
             revert Incentive__QuestInactive(data.questId);
         }
 
-        // Check cooldown: each address can claim for a given quest only once every 24 hours.
-        uint256 lastClaim = s_lastClaimed[data.questId][msg.sender];
+        // Check if the recipient address is valid
+        if (data.toAddress == address(0)) {
+            revert Incentive__ZeroRecipient();
+        }
+
+        // Check cooldown: each recipient can claim for a given quest only once every 24 hours.
+        uint256 lastClaim = s_lastClaimed[data.questId][data.toAddress];
         if (block.timestamp < lastClaim + CLAIM_INTERVAL) {
             uint256 timeLeft = (lastClaim + CLAIM_INTERVAL) - block.timestamp;
             revert Incentive__ClaimCooldownNotExpired(timeLeft);
@@ -278,7 +295,7 @@ contract Incentive is
         _validateSignature(data, signature);
 
         // Update last claimed timestamp.
-        s_lastClaimed[data.questId][msg.sender] = block.timestamp;
+        s_lastClaimed[data.questId][data.toAddress] = block.timestamp;
 
         // Emit wallet data for tracking
         emit WalletData(data.questId, data.toAddress, data.walletProvider, data.embedOrigin);
@@ -445,6 +462,23 @@ contract Incentive is
             revert Incentive__WithdrawFailed();
         }
         emit ContractWithdrawal(withdrawAmount);
+    }
+
+    /// @notice Rescues ERC20 tokens mistakenly sent to this contract
+    /// @dev Only callable by DEFAULT_ADMIN_ROLE. Uses SafeERC20 for safety.
+    /// @param token The ERC20 token address to withdraw
+    /// @param to The recipient address
+    /// @param amount The amount to withdraw
+    function rescueERC20(address token, address to, uint256 amount)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        nonReentrant
+    {
+        if (token == address(0)) revert Incentive__ZeroTokenAddress();
+        if (to == address(0)) revert Incentive__ZeroRecipient();
+        if (amount == 0) revert Incentive__ZeroAmount();
+        IERC20(token).safeTransfer(to, amount);
+        emit ERC20Withdrawal(token, to, amount);
     }
 
     /// @notice Initializes a new quest with given parameters

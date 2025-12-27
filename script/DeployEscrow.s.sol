@@ -4,13 +4,13 @@ pragma solidity 0.8.26;
 import {console} from "forge-std/console.sol";
 import {Script} from "forge-std/Script.sol";
 
-import {Factory} from "../src/escrow/Factory.sol";
-import {IFactory} from "../src/escrow/interfaces/IFactory.sol";
+import {Factory} from "../src/incentive/Factory.sol";
+import {IFactory} from "../src/incentive/interfaces/IFactory.sol";
 import {MockERC20} from "../test/mock/MockERC20.sol";
 import {MockERC721} from "../test/mock/MockERC721.sol";
 import {MockERC1155} from "../test/mock/MockERC1155.sol";
 
-import {Incentive} from "../src/Incentive.sol";
+import {Incentive} from "../src/incentive/Incentive.sol";
 
 import {IERC20} from "@openzeppelin-contracts/interfaces/IERC20.sol";
 import {IERC721} from "@openzeppelin-contracts/interfaces/IERC721.sol";

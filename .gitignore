@@ -23,4 +23,14 @@ bin/*
 node_modules
 zkout/
 
+# SDK build artifacts
+sdk/dist/
+sdk/node_modules/
+generate-abis.js
+
+# Generated ABI files
+sdk/abis/*.js
+sdk/abis/*.d.ts
+sdk/abis/*.d.ts.map
+
 .DS_Store
